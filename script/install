@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#
+# Run all dotfiles installers.
+
+## constants
+__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+__root_dir="${__dir}/.."
+
+## set flags
+# Exit on error. Append "|| true" if you expect an error.
+set -o errexit
+# Exit on error inside any functions or subshells.
+set -o errtrace
+# Catch the error in case pipe fails
+set -o pipefail
+# Turn on traces, useful while debugging but commented out by default
+[[ "${DEBUG}" = true ]] && set -o xtrace
+
+# Run Homebrew through the Brewfile
+echo "› brew bundle"
+brew bundle --file="${__root_dir}/Brewfile"
+
+# find the installers and run them iteratively
+echo "› run installers"
+find "${__root_dir}" -type f -name install.sh | xargs -n 1 sh -c

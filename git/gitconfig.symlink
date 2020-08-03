@@ -1,0 +1,77 @@
+# Local/private config goes in the include
+[include]
+    path = ~/.gitconfig.local
+[hub]
+    protocol = https
+[alias]
+    co = checkout
+    promote = !$DOTFILES/bin/git-promote
+    wtf     = !$DOTFILES/bin/git-wtf
+    rank-contributors = !$DOTFILES/bin/git-rank-contributors
+    count   = !git shortlog -sn
+    cob = checkout -b
+    ci = commit
+    st = status -s
+    br = branch
+    # different ways to show our commits, depending on what we are looking for
+    ls = log --pretty=format:\"%C(yellow)%h%Cred%d %Creset%s%Cblue [%cn]\" --decorate
+    ll = log --pretty=format:\"%C(yellow)%h%Cred%d %Creset%s%Cblue [%cn]\" --decorate --numstat
+    lnc = log --pretty=format:\"%h %s [%cn]\"
+    # Show changes that have been staged
+    diffc = diff --cached
+    # saves all updates as Working in Progress. USE WITH CARE!
+    wip = !git add -u && git commit -m "WIP"
+    # remove a file from staging
+    unstage = reset HEAD --
+    # show what the last commit has
+    last = log -1 HEAD
+    # list all aliases that we added :D
+    list-aliases = !git config -l | grep alias | cut -c 7-
+    # remove last commit
+    undo-commit = reset --soft HEAD~
+    # Shows current branch-name. Useful for other aliases.
+    branch-name = "!git rev-parse --abbrev-ref HEAD"
+    # Push the current branch to the remote "origin", and set it to track
+    # the upstream branch
+    publish = "!git push -u origin $(git branch-name)"
+    # Delete the remote version of the current branch
+    unpublish = "!git push origin :$(git branch-name)"
+    # Remove already merged branches
+    cleanup = "!git branch --merged | grep  -v '\\*\\|master\\|develop' | xargs -n 1 git branch -d"
+    # prettier logs
+    lg = "log --pretty=oneline --abbrev-commit --graph --decorate"
+    # your basic amend
+    amend = commit --amend
+    forgot-something-2-commit = commit --amend --no-edit
+    stash-unapply = !git stash show -p | git apply -R
+    # pull & cleanup
+    update = "!git pull && git cleanup"
+    # GRaphical lOG
+    grog = log --graph --abbrev-commit --decorate --all --format=format:\"%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(dim white) - %an%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n %C(white)%s%C(reset)\"
+    # stash only untracked files
+    stsh = stash --keep-index
+    # stash including untracked, but not new
+    staash = stash --include-untracked
+    # stash EVERYTHING!
+    staaash = stash --all
+    # push asking nicelly
+    please = push --force-with-lease
+[pager]
+    diff = diff-so-fancy | less --tabs=1,5 -RFX
+    show = diff-so-fancy | less --tabs=1,5 -RFX
+[push]
+    default = simple
+[init]
+    templatedir = ~/.git_global
+[core]
+    excludesfile = ~/.gitignore
+	pager = diff-so-fancy | less --tabs=5 -RFX
+[filter "lfs"]
+	smudge = git-lfs smudge --skip -- %f
+	process = git-lfs filter-process --skip
+	required = true
+	clean = git-lfs clean -- %f
+[branch]
+	autosetuprebase = always
+[lfs]
+	locksverify = false

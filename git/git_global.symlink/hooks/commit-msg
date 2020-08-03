@@ -1,0 +1,53 @@
+#!/bin/sh
+
+## set flags
+# Exit on error. Append "|| true" if you expect an error.
+set -o errexit
+# Exit on error inside any functions or subshells.
+set -o errtrace
+# Catch the error in case pipe fails
+set -o pipefail
+# Turn on traces, turn own by adding DEBUG=true to environment variables
+[[ "${DEBUG}" = true ]] && set -o xtrace
+
+get_current_branch_name() {
+    git symbolic-ref HEAD | sed 's!refs\/heads\/!!'
+}
+info() {
+    printf "  [ \033[00;34mINFO\033[0m ] $1\n"
+}
+warn() {
+    printf "  [ \033[00;33m WARN \033[0m ] $1\n"
+}
+
+extract_jira_ticket() {
+    echo $1 | grep -e '[a-zA-Z0-9]\+-[0-9]\+' -o | head -n1 || echo ""
+}
+
+# extract jira ticket from commit message
+message="$(cat $1)"
+ticket=$(extract_jira_ticket "$message")
+
+# if no jira ticket number was found
+if [ -z "$ticket" ];
+  then
+    # try to extract jira ticket number from branch name
+    branch_name="$(get_current_branch_name)"
+    ticket="$(extract_jira_ticket "$branch_name")"
+
+    if [ ! ${message:0:1} == "\n" ]
+    then
+        if [ -n "$ticket" ]
+        # add if there is a ticket number on the branch, just add it to the commit msg
+        then
+            info "Adding ticket number '\033[0;36m$ticket\033[0m' to commit message: "
+            echo "$ticket: $message" > "$1"
+        else
+            warn "No ticket number was found to be added to commit message!"
+            warn "Remember to either add it by yourself or create the branch using the ticket number."
+            warn "Example: \033[0;32mgit checkout -b RE-1235-branch-with-jira-ticket-number\033[0m\n"
+        fi
+    fi
+  else
+    info "Ticket number '\033[0;36m$ticket\033[0m' was already added to commit message"
+fi
