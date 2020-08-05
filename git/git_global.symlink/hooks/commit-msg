@@ -41,7 +41,7 @@ if [ -z "$ticket" ];
         # add if there is a ticket number on the branch, just add it to the commit msg
         then
             info "Adding ticket number '\033[0;36m$ticket\033[0m' to commit message: "
-            echo "$ticket: $message" > "$1"
+            echo "$message\n\n$ticket\n" > "$1"
         else
             warn "No ticket number was found to be added to commit message!"
             warn "Remember to either add it by yourself or create the branch using the ticket number."

@@ -75,3 +75,5 @@
 	autosetuprebase = always
 [lfs]
 	locksverify = false
+[submodule]
+	recurse = true
