@@ -30,7 +30,7 @@
     # remove last commit
     undo-commit = reset --soft HEAD~
     # Shows current branch-name. Useful for other aliases.
-    branch-name = "!git rev-parse --abbrev-ref HEAD"
+    branch-name = !git rev-parse --abbrev-ref HEAD
     # Push the current branch to the remote "origin", and set it to track
     # the upstream branch
     publish = "!git push -u origin $(git branch-name)"
@@ -38,8 +38,6 @@
     unpublish = "!git push origin :$(git branch-name)"
     # Remove already merged branches
     cleanup = "!git branch --merged | grep  -v '\\*\\|master\\|develop' | xargs -n 1 git branch -d"
-    # prettier logs
-    lg = "log --pretty=oneline --abbrev-commit --graph --decorate"
     # your basic amend
     amend = commit --amend
     forgot-something-2-commit = commit --amend --no-edit
@@ -56,6 +54,10 @@
     staaash = stash --all
     # push asking nicelly
     please = push --force-with-lease
+    # pretty log
+    lg = log --graph --abbrev-commit --decorate --all \
+        --format=format:\"%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(dim white) \
+        - %an%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n %C(white)%s%C(reset)\"
 [pager]
     diff = diff-so-fancy | less --tabs=1,5 -RFX
     show = diff-so-fancy | less --tabs=1,5 -RFX
@@ -63,17 +65,18 @@
     default = simple
 [init]
     templatedir = ~/.git_global
+    defaultBranch = main
 [core]
     excludesfile = ~/.gitignore
-	pager = diff-so-fancy | less --tabs=5 -RFX
+    pager = diff-so-fancy | less --tabs=5 -RFX
 [filter "lfs"]
-	smudge = git-lfs smudge --skip -- %f
-	process = git-lfs filter-process --skip
-	required = true
-	clean = git-lfs clean -- %f
+    smudge = git-lfs smudge --skip -- %f
+    process = git-lfs filter-process --skip
+    required = true
+    clean = git-lfs clean -- %f
 [branch]
-	autosetuprebase = always
+    autosetuprebase = always
 [lfs]
-	locksverify = false
+    locksverify = false
 [submodule]
-	recurse = true
+    recurse = true

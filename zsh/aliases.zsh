@@ -16,6 +16,7 @@ alias du='ncdu --color dark -rr -x --exclude .git --exclude node_modules'
 alias help='tldr'
 alias ping='prettyping --nolegend'
 alias preview="fzf --preview 'bat --color \"always\" {}'"
+
 # add support for ctrl+o to open selected file in VS Code
 export FZF_DEFAULT_OPTS="--bind='ctrl-o:execute(code {})+abort'"
 alias top='sudo htop'
@@ -36,3 +37,16 @@ alias 6='cd -6'
 alias 7='cd -7'
 alias 8='cd -8'
 alias 9='cd -9'
+
+# remove dir
+alias yeet='rm -rf'
+
+# polite
+alias please='sudo'
+
+# mvn wrapper
+alias mw='./mvnw'
+
+# goto
+alias goto='cd -P'
+

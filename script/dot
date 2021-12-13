@@ -5,12 +5,25 @@
 # `dot` handles installation, updates, things like that. Run it periodically
 # to make sure you're on the latest and greatest.
 
-set -e
+## constants
+__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+__root_dir="$(cd "${__dir}/.." && pwd -P)"
 
-parentDirectory="$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd -P)"
-dotfilesDirectory="$(cd "$( dirname "$parentDirectory" )" && pwd -P)"
+## env variables
+export DOTFILES=$HOME/.dotfiles
 
-displayUsageAndExit() {
+## set flags
+# Exit on error. Append "|| true" if you expect an error.
+set -o errexit
+# Exit on error inside any functions or subshells.
+set -o errtrace
+# Catch the error in case pipe fails
+set -o pipefail
+# Turn on traces, useful while debugging but commented out by default
+[[ "${DEBUG}" = true ]] && set -o xtrace
+
+
+usage() {
 	echo "dot -- dotfiles management"
 	echo ""
 	echo "Usage: dot [options]"
@@ -24,21 +37,19 @@ displayUsageAndExit() {
 while test $# -gt 0; do
 	case "$1" in
 		"-h"|"--help")
-			displayUsageAndExit
+			usage
 			;;
 		"-e"|"--edit")
-			exec "$EDITOR" "$dotfilesDirectory"
+			exec "$EDITOR" "${DOTFILES}"
 			exit
 			;;
 		*)
 			echo "Invalid option: $1"
-			displayUsageAndExit
+			usage
 			;;
 	esac
 	shift
 done
-
-export DOTFILES=$HOME/.dotfiles
 
 # Install homebrew
 $DOTFILES/homebrew/install.sh 2>&1
