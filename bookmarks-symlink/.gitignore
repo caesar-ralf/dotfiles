@@ -1,4 +1,0 @@
-# all bookmarks should start with `@` and are specific to
-# each machine I start, so we don't save it in the
-# .dotconfig
-@*
