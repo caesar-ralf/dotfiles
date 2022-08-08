@@ -61,3 +61,7 @@ source "`brew --prefix`/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.z
 if [ -d "$HOME/.bookmarks" ]; then
   export CDPATH=".:$HOME/.bookmarks:/"
 fi
+
+# gpg
+GPG_TTY=$(tty)
+export GPG_TTY
