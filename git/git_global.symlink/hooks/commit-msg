@@ -21,11 +21,11 @@ warn() {
 }
 
 extract_jira_ticket() {
-    echo $1 | grep -e '[a-zA-Z0-9]\+-[0-9]\+' -o | head -n1 || echo ""
+    echo $1 | grep -v '^#' | grep -E '[A-Z]{4,}-[0-9]+' -o | head -n1 || echo ""
 }
 
 # extract jira ticket from commit message
-message="$(cat $1)"
+message="$(cat $1 | grep -v '^#')"
 ticket=$(extract_jira_ticket "$message")
 
 # if no jira ticket number was found
