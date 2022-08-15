@@ -62,7 +62,7 @@
     dft = difftool
 # Use a pager for large output, just like other git commands.
 [pager]
-        difftool = true
+    difftool = true
 [push]
     default = simple
 [init]
@@ -83,10 +83,10 @@
 [submodule]
     recurse = true
 [diff]
-        tool = difftastic
+    tool = difftastic
 
 [difftool]
-        prompt = false
+    prompt = false
 
 [difftool "difftastic"]
-        cmd = difft "$LOCAL" "$REMOTE"
+    cmd = difft "$LOCAL" "$REMOTE"
