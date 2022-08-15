@@ -1,6 +1,21 @@
 #!/bin/sh
+##
+# DESCRIPTION:
+#
+# Script to be used as commit hook that will extract ticket number from the branch name
+# and add it to the end of your commit msg. The script expects the JIRA ticket to follow
+# the format of PROJECTSYMBOL-TICKETNUMBER.
+#
+# For example, after adding this to your commit-hooks you can create branchs with names 
+# like:
+#
+# ```
+# git checkout -b WEAV-1234-some-description
+# ````
+# 
+# and the script will add WEAV-1234 to end of your commit messages.
 
-## set flags
+## flags
 # Exit on error. Append "|| true" if you expect an error.
 set -o errexit
 # Exit on error inside any functions or subshells.
@@ -10,21 +25,28 @@ set -o pipefail
 # Turn on traces, turn own by adding DEBUG=true to environment variables
 [[ "${DEBUG}" = true ]] && set -o xtrace
 
+## functions
 get_current_branch_name() {
     git symbolic-ref HEAD | sed 's!refs\/heads\/!!'
 }
 info() {
-    printf "  [ \033[00;34mINFO\033[0m ] $1\n"
+    printf "  [\033[00;34mINFO\033[0m] $1\n"
 }
 warn() {
-    printf "  [ \033[00;33m WARN \033[0m ] $1\n"
+    printf "  [\033[00;33mWARN\033[0m] $1\n"
 }
 
 extract_jira_ticket() {
-    echo $1 | grep -v '^#' | grep -E '[A-Z]{4,}-[0-9]+' -o | head -n1 || echo ""
+    echo $1 | grep -E '[A-Z]{4,}-[0-9]+' -o | head -n1 || echo ""
 }
 
+## main
 # extract jira ticket from commit message
+branch_name="$(get_current_branch_name)"
+
+# if we are in master/main, just exit as we won't have a ticket number
+[ "$branch_name" == "master" ] || [ "$branch_name" == "main" ] && exit 0
+
 message="$(cat $1 | grep -v '^#')"
 ticket=$(extract_jira_ticket "$message")
 
@@ -32,7 +54,6 @@ ticket=$(extract_jira_ticket "$message")
 if [ -z "$ticket" ];
   then
     # try to extract jira ticket number from branch name
-    branch_name="$(get_current_branch_name)"
     ticket="$(extract_jira_ticket "$branch_name")"
 
     if [ ! ${message:0:1} == "\n" ]
@@ -45,7 +66,7 @@ if [ -z "$ticket" ];
         else
             warn "No ticket number was found to be added to commit message!"
             warn "Remember to either add it by yourself or create the branch using the ticket number."
-            warn "Example: \033[0;32mgit checkout -b RE-1235-branch-with-jira-ticket-number\033[0m\n"
+            warn "Example: \033[0;32mgit checkout -b WEAV-1235-branch-with-jira-ticket-number\033[0m\n"
         fi
     fi
   else
