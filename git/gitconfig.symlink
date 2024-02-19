@@ -78,15 +78,55 @@
     clean = git-lfs clean -- %f
 [branch]
     autosetuprebase = always
+    sort = -committerdate
 [lfs]
     locksverify = false
 [submodule]
     recurse = true
 [diff]
+    # https://difftastic.wilfred.me.uk/
     tool = difftastic
-
+    # handles functions being reordered: https://luppeng.wordpress.com/2020/10/10/when-to-use-each-of-the-git-diff-algorithms/
+    algorithm = histogram
+    # uses different colours to highlight lines in diffs that have been “moved”
+    colorMoved = default
+    # ignores indentation changes
+    colorMovedWS = allow-indentation-change
+    submodule = log
 [difftool]
     prompt = false
-
 [difftool "difftastic"]
     cmd = difft "$LOCAL" "$REMOTE"
+[merge]
+    tool = vscode
+	conflictStyle = zdiff3
+    keepbackup = false
+[mergetool "vscode"]
+    cmd = code --wait --merge $REMOTE $LOCAL $BASE $MERGED
+[rebase]
+    autosquash = true
+    autostash = true
+[pull]
+    rebase = true
+[rerere]
+    enabled = true
+[help]
+    autocorrect = 1
+# fix URLs that I mistakenly cloned using the HTTP
+[url "git@github.com:"]
+	insteadOf = "https://github.com/"
+[url "git@gist.github.com:"]
+    insteadOf = https://gist.github.com/
+[url "git@ghe.spotify.net:"]
+    insteadOf = https://ghe.spotify.net/
+[transfer]
+    fsckobjects = true
+[fetch]
+    fsckobjects = true
+    prune = true
+[receive]
+    fsckobjects = true
+[log]
+    date = iso
+[status]
+    submoduleSummary = true
