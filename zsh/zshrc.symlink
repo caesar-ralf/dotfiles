@@ -69,5 +69,3 @@ export GPG_TTY
 # Created by `pipx` on 2022-08-18 08:58:16
 export PATH="$PATH:$HOME/.local/bin"
 export WORKSPACE="$HOME/workspace"
-
-source "$HOME/.docker/init-zsh.sh" || true # Added by Docker Desktop

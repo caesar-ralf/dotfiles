@@ -117,8 +117,6 @@
 	insteadOf = "https://github.com/"
 [url "git@gist.github.com:"]
     insteadOf = https://gist.github.com/
-[url "git@ghe.spotify.net:"]
-    insteadOf = https://ghe.spotify.net/
 [transfer]
     fsckobjects = true
 [fetch]
