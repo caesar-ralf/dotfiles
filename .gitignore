@@ -3,3 +3,4 @@ Brewfile.lock.json
 m2.symlink/repository/
 m2.symlink/wrapper/
 bin/cloud_sql_proxy
+m2.symlink/settings.xml
