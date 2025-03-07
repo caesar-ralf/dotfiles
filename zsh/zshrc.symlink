@@ -66,6 +66,11 @@ fi
 GPG_TTY=$(tty)
 export GPG_TTY
 
-# Created by `pipx` on 2022-08-18 08:58:16
 export PATH="$PATH:$HOME/.local/bin"
 export WORKSPACE="$HOME/workspace"
+
+# The following lines have been added by Docker Desktop to enable Docker CLI completions.
+fpath=(/Users/CFRANZHO/.docker/completions $fpath)
+autoload -Uz compinit
+compinit
+# End of Docker CLI completions

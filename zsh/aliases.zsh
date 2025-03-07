@@ -11,7 +11,6 @@ alias intellij='open -a "IntelliJ IDEA"'
 alias gw=./gradlew
 
 # tool replacing
-alias cat='bat --show-all'
 alias du='ncdu --color dark -rr -x --exclude .git --exclude node_modules'
 alias help='tldr'
 alias ping='prettyping --nolegend'
