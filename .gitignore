@@ -1,6 +1,26 @@
 git/gitconfig.local.symlink
+# --- Machine-local / generated ---
 Brewfile.lock.json
+bin/cloud_sql_proxy
+.idea/
+.DS_Store
+
+# --- Maven cache & credentials (never commit) ---
 m2.symlink/repository/
 m2.symlink/wrapper/
-bin/cloud_sql_proxy
 m2.symlink/settings.xml
+m2.symlink/settings.xml.bkup
+
+# --- Secrets: local, never-committed overrides ---
+# Any file ending in .local.zsh is machine-local and git-ignored.
+*.local.zsh
+system/env.local.zsh
+git/gitconfig.local.symlink
+
+# --- Generic secret files ---
+.env
+.env.*
+*.pem
+*.key
+*_rsa
+*_ed25519
