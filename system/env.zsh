@@ -26,7 +26,7 @@ GITHUB_TOKEN="$(secret GITHUB_TOKEN)"
 
 # Maven / Artifactory credentials are referenced by ~/.m2/settings.xml via
 # ${env.ARTIFACTORY_USER} / ${env.ARTIFACTORY_TOKEN}.
-ARTIFACTORY_USER="${ARTIFACTORY_USER:-$(secret ARTIFACTORY_USER)}"
+ARTIFACTORY_USER="cfranzho"
 ARTIFACTORY_TOKEN="$(secret ARTIFACTORY_TOKEN)"
 [ -n "$ARTIFACTORY_USER" ] && export ARTIFACTORY_USER
 [ -n "$ARTIFACTORY_TOKEN" ] && export ARTIFACTORY_TOKEN
