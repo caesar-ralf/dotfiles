@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# volvo-jwt-token -- print the `sub` (subject) claim of a fresh Volvo ID token.
+#
+# Usage:
+#   volvo-jwt-token [-e|--environment ENV]
+#
+#   ENV defaults to "qa". Supported: qa, prod.
+#
+# Requires: oidc-cli, jq, jwt (jwt-cli)
+
+## set flags
+set -o errexit
+set -o errtrace
+set -o pipefail
+[ "${DEBUG}" = "true" ] && set -o xtrace
+
+CLIENT_ID="mo2qy9h_20"
+ENVIRONMENT="qa"
+
+usage() {
+	echo "volvo-jwt-token -- print the subject claim of a fresh Volvo ID token"
+	echo ""
+	echo "Usage: volvo-jwt-token [options]"
+	echo ""
+	echo "Options:"
+	echo "  -e, --environment ENV   Volvo ID environment (qa|prod). Default: qa"
+	echo "  -h, --help              Show this help message and exit"
+	exit "${1:-0}"
+}
+
+while test $# -gt 0; do
+	case "$1" in
+		"-h"|"--help")
+			usage 0
+			;;
+		"-e"|"--environment")
+			shift
+			[ $# -gt 0 ] || { echo "Missing value for --environment" >&2; usage 1; }
+			ENVIRONMENT="$1"
+			;;
+		*)
+			echo "Invalid option: $1" >&2
+			usage 1
+			;;
+	esac
+	shift
+done
+
+case "$ENVIRONMENT" in
+	qa)   ISSUER="https://volvoid.eu.qa.volvocars.com" ;;
+	prod) ISSUER="https://volvoid.eu.volvocars.com" ;;
+	*)    echo "Unknown environment: $ENVIRONMENT (expected qa|prod)" >&2; exit 1 ;;
+esac
+
+oidc-cli authorization_code --issuer "$ISSUER" --client-id "$CLIENT_ID" --pkce \
+	| jq -r ".access_token" \
+	| jwt decode - -j \
+	| jq -r ".payload.sub"

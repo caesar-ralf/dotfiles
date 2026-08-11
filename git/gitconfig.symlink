@@ -37,7 +37,7 @@
     # Delete the remote version of the current branch
     unpublish = "!git push origin :$(git branch-name)"
     # Remove already merged branches
-    cleanup = "!git branch --merged | grep  -v '\\*\\|master\\|develop' | xargs -n 1 git branch -d"
+    cleanup = "!f() { git fetch --all --prune; git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -D; }; f"
     # your basic amend
     amend = commit --amend
     forgot-something-2-commit = commit --amend --no-edit
@@ -70,7 +70,7 @@
     defaultBranch = main
 [core]
     excludesfile = ~/.gitignore
-    pager = diff-so-fancy | less --tabs=5 -RFX
+	pager = delta
 	autocrlf = input
 [filter "lfs"]
 	smudge = git-lfs smudge -- %f
@@ -99,11 +99,7 @@
 [difftool "difftastic"]
     cmd = difft "$LOCAL" "$REMOTE"
 [merge]
-    tool = vscode
-    conflictStyle = zdiff3
-    keepbackup = false
-[mergetool "vscode"]
-    cmd = code --wait --merge $REMOTE $LOCAL $BASE $MERGED
+	conflictStyle = zdiff3
 [rebase]
     autosquash = true
     autostash = true
@@ -129,3 +125,19 @@
     date = iso
 [status]
     submoduleSummary = true
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+[gpg]
+	format = ssh
+[gpg "ssh"]
+	program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+[commit]
+	gpgsign = true
+[user]
+	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEM/Nysjlp6nVFqp9vyzaZ49IiHthuw/VWQ0QnOmNnmW
+[credential "https://gitlab.oss.volvoc3.com"]
+	username = cfranzho
+[tag]
+	gpgsign = false
