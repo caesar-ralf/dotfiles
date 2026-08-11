@@ -1,13 +1,27 @@
+# Enable Powerlevel10k instant prompt. Keep this near the top of ~/.zshrc.
+# Anything that needs console input (password prompts, etc.) must run ABOVE this.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
 # shortcut to this dotfiles path is DOTFILES
 export DOTFILES=$HOME/.dotfiles
 export DEFAULT_USER=`whoami`
+
+# Keep PATH/fpath entries unique so they don't grow on every nested shell.
+typeset -U path PATH fpath
+
+# Homebrew prefix, resolved once (avoids spawning `brew --prefix` repeatedly).
+export BREW_PREFIX="${HOMEBREW_PREFIX:-$(brew --prefix)}"
 
 # your project folder that we can `c [tab]` to
 export PROJECTS="~/workspace"
 
 # all of our zsh files
+# NOTE: use a bounded (depth-2) glob, NOT `**`. A recursive `**/*.zsh` would
+# descend into m2.symlink/repository/ (16k+ Maven cache dirs) on every startup.
 typeset -U config_files
-config_files=($DOTFILES/**/*.zsh)
+config_files=($DOTFILES/*/*.zsh)
 
 # load the path files first (files named _path.zsh)
 for file in ${(M)config_files:#*/_path.zsh}
@@ -21,9 +35,22 @@ do
   source $file
 done
 
-# initialize autocomplete here, otherwise functions won't be loaded
+# Extra completion directories must be on fpath BEFORE compinit runs.
+[ -d "$HOME/.docker/completions" ] && fpath=("$HOME/.docker/completions" $fpath)
+
+# Initialize the completion system exactly once, and cheaply:
+#   - rebuild the ~/.zcompdump cache at most once every 24h
+#   - otherwise trust the cache and skip the slow security audit (-C)
+# Because `compinit` is defined afterwards, vendored scripts that do
+# `autoload -U +X compinit && compinit` (gcloud, Docker, ...) short-circuit
+# and won't re-run it.
 autoload -Uz compinit
-compinit
+if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qNmh+24) ]]; then
+  compinit
+else
+  compinit -C
+fi
+
 # load every completion after autocomplete loads
 for file in ${(M)config_files:#*/completion.zsh}
 do
@@ -42,13 +69,13 @@ bindkey "^[[A" up-line-or-beginning-search # Up
 bindkey "^[[B" down-line-or-beginning-search # Down
 
 # POWER10K
-source "`brew --prefix`/opt/powerlevel10k/share/powerlevel10k/powerlevel10k.zsh-theme"
+source "$BREW_PREFIX/opt/powerlevel10k/share/powerlevel10k/powerlevel10k.zsh-theme"
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
-# GOOGLE CLOUD SDK
-source "`brew --prefix`/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc"
-source "`brew --prefix`/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc"
+# GOOGLE CLOUD SDK (its internal compinit is skipped; see note above)
+source "$BREW_PREFIX/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc"
+source "$BREW_PREFIX/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc"
 
 # bookmarks
 if [ -d "$HOME/.bookmarks" ]; then
@@ -62,8 +89,3 @@ export GPG_TTY
 export PATH="$PATH:$HOME/.local/bin"
 export WORKSPACE="$HOME/workspace"
 (( ! ${+functions[p10k]} )) || p10k finalize
-# The following lines have been added by Docker Desktop to enable Docker CLI completions.
-fpath=(/Users/CFRANZHO/.docker/completions $fpath)
-autoload -Uz compinit
-compinit
-# End of Docker CLI completions
