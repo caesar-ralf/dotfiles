@@ -1,16 +1,17 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
-# dot
+# dot — dotfiles management.
 #
-# `dot` handles installation, updates, things like that. Run it periodically
-# to make sure you're on the latest and greatest.
+# `dot` handles installation and updates. Run it periodically to make sure
+# you're on the latest and greatest:
+#     dot                 # update Homebrew and re-run all installers
+#     dot --edit          # open the dotfiles repo in $EDITOR
+#     dot --secrets       # (re)configure secrets in the Keychain
+#     dot --no-update     # run installers without `brew update` first
 
 ## constants
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-__root_dir="$(cd "${__dir}/.." && pwd -P)"
-
-## env variables
-export DOTFILES=$HOME/.dotfiles
+source "${__dir}/lib/common.sh"
 
 ## set flags
 # Exit on error. Append "|| true" if you expect an error.
@@ -20,44 +21,59 @@ set -o errtrace
 # Catch the error in case pipe fails
 set -o pipefail
 # Turn on traces, useful while debugging but commented out by default
-[[ "${DEBUG}" = true ]] && set -o xtrace
+[[ "${DEBUG:-}" = true ]] && set -o xtrace
 
+DO_UPDATE=true
 
 usage() {
-	echo "dot -- dotfiles management"
-	echo ""
-	echo "Usage: dot [options]"
-	echo ""
-	echo "Options:"
-	echo "  -e, --edit    Open dotfiles directory for editing"
-	echo "  -h, --help    Show this help message and exit"
-	exit
+    cat <<EOF
+dot -- dotfiles management
+
+Usage: dot [options]
+
+Options:
+  -e, --edit       Open the dotfiles directory in \$EDITOR and exit
+  -s, --secrets    Run the interactive secrets setup and exit
+      --no-update  Skip 'brew update' (just re-run the installers)
+      --no-edit    (internal) no-op, kept for bootstrap compatibility
+  -h, --help       Show this help message and exit
+EOF
+    exit "${1:-0}"
 }
 
 while test $# -gt 0; do
-	case "$1" in
-		"-h"|"--help")
-			usage
-			;;
-		"-e"|"--edit")
-			exec "$EDITOR" "${DOTFILES}"
-			exit
-			;;
-		*)
-			echo "Invalid option: $1"
-			usage
-			;;
-	esac
-	shift
+    case "$1" in
+        -h|--help)      usage 0 ;;
+        -e|--edit)      exec "${EDITOR:-vim}" "${DOTFILES}" ;;
+        -s|--secrets)   exec "${DOTFILES}/script/secrets" ;;
+        --no-update)    DO_UPDATE=false ;;
+        --no-edit)      ;; # accepted for compatibility with bootstrap
+        *)              warn "Invalid option: $1"; usage 1 ;;
+    esac
+    shift
 done
 
-# Install homebrew
-$DOTFILES/homebrew/install.sh 2>&1
+banner "dot — updating your setup"
 
-# Upgrade homebrew
-echo "› brew update"
-brew update
+# Install Homebrew (no-op if already present).
+header "Homebrew"
+"${DOTFILES}/homebrew/install.sh" 2>&1
 
-# Install software
-echo "› $DOTFILES/script/install"
-$DOTFILES/script/install
+# Upgrade Homebrew formulae metadata.
+if [ "$DO_UPDATE" = true ]; then
+    header "brew update"
+    if command_exists brew; then
+        brew update
+        success "Homebrew is up to date."
+    else
+        warn "brew not found on PATH — skipping update."
+    fi
+else
+    note "  Skipping 'brew update' (--no-update)."
+fi
+
+# Install/refresh all software.
+"${DOTFILES}/script/install"
+
+header "Done"
+success "Everything is up to date. 🎉"

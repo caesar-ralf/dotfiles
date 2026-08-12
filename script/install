@@ -3,8 +3,8 @@
 # Run all dotfiles installers.
 
 ## constants
-__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-__root_dir="${__dir}/.."
+__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${__dir}/lib/common.sh"
 
 ## set flags
 # Exit on error. Append "|| true" if you expect an error.
@@ -14,12 +14,26 @@ set -o errtrace
 # Catch the error in case pipe fails
 set -o pipefail
 # Turn on traces, useful while debugging but commented out by default
-[[ "${DEBUG}" = true ]] && set -o xtrace
+[[ "${DEBUG:-}" = true ]] && set -o xtrace
 
-# Run Homebrew through the Brewfile
-echo "› brew bundle"
-brew bundle --file="${__root_dir}/Brewfile"
+# Run Homebrew through the Brewfile.
+header "brew bundle"
+if command_exists brew; then
+    brew bundle --file="${DOTFILES}/Brewfile"
+    success "Brewfile applied."
+else
+    warn "brew not found on PATH — skipping Brewfile."
+fi
 
-# find the installers and run them iteratively
-echo "› run installers"
-find "${__root_dir}" -type f -name install.sh | xargs -n 1 sh -c
+# Find every topic installer and run it. Prune the huge Maven cache so we don't
+# walk 16k+ directories under m2.symlink/repository looking for install.sh.
+header "Running topic installers"
+while IFS= read -r installer; do
+    info "→ ${installer#"${DOTFILES}"/}"
+    sh -c "$installer"
+done < <(find "${DOTFILES}" \
+            -path "${DOTFILES}/m2.symlink/repository" -prune -o \
+            -type f -name install.sh -print)
+
+header "Done"
+success "All installers finished."

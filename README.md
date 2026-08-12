@@ -4,10 +4,21 @@ Simplified version of my dotfiles preferences. To start, just run `script/bootst
 
 ## Installing / updating
 
-- `script/bootstrap` — symlinks every `*.symlink` file into `$HOME`, sets up
-  `gitconfig`, and (on macOS) installs dependencies.
+- `script/bootstrap` — the one command to set up a fresh machine. It creates
+  `gitconfig`, symlinks every `*.symlink` file into `$HOME`, (on macOS) installs
+  all dependencies, and offers to set up your secrets. Safe to re-run; set
+  `DOTFILES_YES=1` to auto-confirm prompts.
+- `script/dot` — periodic maintenance. Updates Homebrew and re-runs every
+  installer. Flags: `--edit` (open the repo in `$EDITOR`), `--secrets`
+  (reconfigure secrets), `--no-update` (skip `brew update`), `--help`.
 - `script/install` — runs `brew bundle` against the [`Brewfile`](Brewfile) and
   then executes **every** `*/install.sh` in the repo (Homebrew, SDKMAN, fzf-tab, …).
+- `script/secrets` — interactive secrets setup (see [Secrets](#secrets)).
+
+All scripts share [`script/lib/common.sh`](script/lib/common.sh) for consistent,
+colourful output (colours auto-disable when piped or when `NO_COLOR` is set).
+Once the dotfiles are installed, `script/` is on your `PATH`, so you can just run
+`dot`, `bootstrap` or `secrets` from anywhere.
 
 Each topic folder is self-contained: drop an `install.sh` in a folder, and it is
 picked up automatically. The [`Brewfile`](Brewfile) lists every CLI tool and GUI
@@ -62,7 +73,20 @@ all guarded so a fresh machine still boots if something is missing:
 **No secrets are ever committed to this repo.** Everything sensitive is loaded at
 runtime from either the macOS Keychain (preferred) or a git-ignored local file.
 
-### Storing a secret in the Keychain (recommended)
+### Guided setup (recommended)
+
+```sh
+script/secrets            # interactive: prompts for each secret, stores in Keychain
+script/secrets --status   # show which expected secrets are already set
+script/secrets --local    # create system/env.local.zsh from the example
+```
+
+`script/secrets` knows which secrets this setup expects (`GITHUB_TOKEN`,
+`ARTIFACTORY_USER`, `ARTIFACTORY_TOKEN`), skips ones already stored (unless you
+choose to update them), and hides secret values while you type. It is also run
+automatically as the last step of `script/bootstrap`.
+
+### Storing a secret in the Keychain (manual)
 
 ```sh
 secret-set GITHUB_TOKEN
