@@ -16,6 +16,13 @@ set -o pipefail
 # Turn on traces, useful while debugging but commented out by default
 [[ "${DEBUG:-}" = true ]] && set -o xtrace
 
+# Wave goodbye with the right face however we exit. Only greet when run directly
+# (not when invoked from `dot`, which prints its own wizard) to avoid double art.
+if [ "${DOTFILES_WIZARD_GREETED:-0}" != "1" ]; then
+    trap 'wizard_farewell $?' EXIT
+    wizard "Time to gather your tools. Let me fetch the good stuff..."
+fi
+
 # Run Homebrew through the Brewfile.
 header "brew bundle"
 if command_exists brew; then

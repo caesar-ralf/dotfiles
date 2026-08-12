@@ -144,6 +144,12 @@ setup_secrets() {
 }
 
 main() {
+    # Say hello, and wave goodbye with the right face no matter how we exit.
+    trap 'wizard_farewell $?' EXIT
+    wizard --happy "Greetings! I'm your setup wizard. Sit tight while I conjure your dotfiles into place."
+    # Nested scripts (dot, install) shouldn't print their own wizard on top of ours.
+    export DOTFILES_WIZARD_GREETED=1
+
     banner "Bootstrapping your dotfiles"
     setup_gitconfig
     install_dotfiles
