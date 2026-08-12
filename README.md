@@ -52,6 +52,8 @@ all guarded so a fresh machine still boots if something is missing:
   in Homebrew core, so [`fzf-tab/install.sh`](fzf-tab/install.sh) clones it into
   `~/.zsh/fzf-tab` (run automatically by `script/install`).
 - **zoxide** — frecency-based `cd`; jump with `z <partial>`.
+- **oh-my-posh** — the prompt theme engine. The theme is vendored in this repo at
+  [`oh-my-posh/theme.omp.json`](oh-my-posh/theme.omp.json)
 - **zsh-autosuggestions** — fish-style inline suggestions from history (accept with →).
 - **zsh-syntax-highlighting** — colours commands as you type (sourced last).
 
