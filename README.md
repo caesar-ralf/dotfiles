@@ -64,7 +64,19 @@ all guarded so a fresh machine still boots if something is missing:
   `~/.zsh/fzf-tab` (run automatically by `script/install`).
 - **zoxide** — frecency-based `cd`; jump with `z <partial>`.
 - **oh-my-posh** — the prompt theme engine. The theme is vendored in this repo at
-  [`oh-my-posh/theme.omp.json`](oh-my-posh/theme.omp.json)
+  [`oh-my-posh/theme.omp.json`](oh-my-posh/theme.omp.json) and applied
+  automatically on shell start by [`zsh/zshrc.symlink`](zsh/zshrc.symlink) — no
+  manual theme selection needed. The required Nerd Font (`font-fira-code-nerd-font`)
+  is installed by the [`Brewfile`](Brewfile), and [`iterm/install.sh`](iterm/install.sh)
+  installs a matching iTerm2 profile — **"Dotfiles (FiraCode Nerd Font)"** — with the
+  Nerd Font, Night Owl colours (matching the prompt), Option-as-Meta (for the
+  `Alt+f`/`Alt+b` word-nav bindings), UTF-8 and sane bell/scrollback defaults. It is
+  set as the **default** iTerm2 profile automatically, so the prompt glyphs render
+  correctly out of the box. If iTerm2 is already running, fully quit (`Cmd-Q`) and
+  reopen for it to take effect. Opt out with `DOTFILES_ITERM_DEFAULT=0`; your prior
+  default is saved to `~/.local/state/dotfiles/iterm-previous-default-guid` and can be
+  restored with `defaults write com.googlecode.iterm2 'Default Bookmark Guid' -string "<guid>"`.
+  Other terminals: set your font to *FiraCode Nerd Font* manually.
 - **zsh-autosuggestions** — fish-style inline suggestions from history (accept with →).
 - **zsh-syntax-highlighting** — colours commands as you type (sourced last).
 
