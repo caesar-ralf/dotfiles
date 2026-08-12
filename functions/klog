@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# klog -- pick a Kubernetes pod with fzf and tail its logs.
+#
+# Usage:
+#   klog [-n NAMESPACE] [-f] [grep-pattern]
+#
+#   -n NAMESPACE   namespace to look in (default: current context namespace)
+#   -f             follow/stream the logs (kubectl logs -f)
+#   grep-pattern   optional pattern piped through grep --color
+#
+# If `stern` is installed it is preferred for multi-pod streaming when -f is used.
+#
+# Requires: kubectl, fzf. Optional: stern.
+#
+klog () {
+    _ns=""
+    _follow=false
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -n|--namespace) shift; _ns="$1" ;;
+            -f|--follow)    _follow=true ;;
+            -h|--help)
+                sed -n '3,20p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'
+                return 0
+                ;;
+            *) break ;;
+        esac
+        shift
+    done
+
+    _nsflag=""
+    [ -n "$_ns" ] && _nsflag="-n $_ns"
+
+    _pod="$(kubectl get pods $_nsflag --no-headers -o custom-columns=':metadata.name' \
+        | fzf --height=40% --reverse --prompt='pod> ')"
+    [ -z "$_pod" ] && return 1
+
+    _pattern="$1"
+
+    if [ "$_follow" = true ] && command -v stern >/dev/null 2>&1; then
+        stern $_nsflag "$_pod"
+        return $?
+    fi
+
+    if [ "$_follow" = true ]; then
+        if [ -n "$_pattern" ]; then
+            kubectl logs -f $_nsflag "$_pod" | grep --color=auto -- "$_pattern"
+        else
+            kubectl logs -f $_nsflag "$_pod"
+        fi
+    else
+        if [ -n "$_pattern" ]; then
+            kubectl logs $_nsflag "$_pod" | grep --color=auto -- "$_pattern"
+        else
+            kubectl logs $_nsflag "$_pod"
+        fi
+    fi
+}

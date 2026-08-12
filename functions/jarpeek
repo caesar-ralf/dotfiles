@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# jarpeek -- inspect the contents of a .jar (or any zip) without unpacking it.
+#
+# Usage:
+#   jarpeek <jar>                     # list all entries (like `jar tf`)
+#   jarpeek <jar> <pattern>          # list entries matching <pattern>
+#   jarpeek -c <jar> <fqcn>          # javap a class from the jar (e.g. com.foo.Bar)
+#   jarpeek -x <jar> <entry>         # print a single entry to stdout (like `unzip -p`)
+#
+# Tip: pass a directory-relative path or an absolute path under ~/.m2.
+#
+# Requires: jar or unzip; javap (for -c)
+#
+jarpeek () {
+    _mode="list"
+    case "$1" in
+        -c|--class)   _mode="class"; shift ;;
+        -x|--extract) _mode="extract"; shift ;;
+        -h|--help)
+            sed -n '3,17p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'
+            return 0
+            ;;
+    esac
+
+    _jar="$1"
+    if [ -z "$_jar" ] || [ ! -f "$_jar" ]; then
+        echo "Usage: jarpeek [-c|-x] <jar> [pattern|fqcn|entry]" >&2
+        return 1
+    fi
+    shift
+
+    case "$_mode" in
+        class)
+            if [ -z "$1" ]; then
+                echo "jarpeek -c <jar> <fully.qualified.ClassName>" >&2
+                return 1
+            fi
+            javap -classpath "$_jar" "$1"
+            ;;
+        extract)
+            if [ -z "$1" ]; then
+                echo "jarpeek -x <jar> <entry/path/in/jar>" >&2
+                return 1
+            fi
+            unzip -p "$_jar" "$1"
+            ;;
+        list)
+            if command -v jar >/dev/null 2>&1; then
+                _entries="$(jar tf "$_jar")"
+            else
+                _entries="$(unzip -Z1 "$_jar")"
+            fi
+            if [ -n "$1" ]; then
+                printf '%s\n' "$_entries" | grep -i -- "$1"
+            else
+                printf '%s\n' "$_entries"
+            fi
+            ;;
+    esac
+}

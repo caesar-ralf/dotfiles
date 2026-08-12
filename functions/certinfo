@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# certinfo -- summarise an X.509 certificate: subject, issuer, validity and SANs.
+#
+# Usage:
+#   certinfo <cert.pem|.crt|.cer>     # short summary (subject/issuer/dates/SANs)
+#   certinfo -t|--text <cert>         # full `openssl x509 -text` dump
+#
+# Requires: openssl
+#
+certinfo () {
+    _text=false
+    if [ "$1" = "-t" ] || [ "$1" = "--text" ]; then
+        _text=true
+        shift
+    fi
+
+    _cert="$1"
+    if [ -z "$_cert" ] || [ ! -f "$_cert" ]; then
+        echo "Usage: certinfo [-t|--text] <cert.pem>" >&2
+        return 1
+    fi
+
+    if [ "$_text" = true ]; then
+        openssl x509 -in "$_cert" -noout -text
+        return $?
+    fi
+
+    echo "== Subject / Issuer =="
+    openssl x509 -in "$_cert" -noout -subject -issuer
+    echo
+    echo "== Validity =="
+    openssl x509 -in "$_cert" -noout -dates
+    echo
+    echo "== Subject Alternative Names =="
+    _sans="$(openssl x509 -in "$_cert" -noout -ext subjectAltName 2>/dev/null \
+        | grep -v 'X509v3 Subject Alternative Name' \
+        | sed 's/^[[:space:]]*//')"
+    if [ -n "$_sans" ]; then
+        printf '%s\n' "$_sans"
+    else
+        echo "(none)"
+    fi
+}

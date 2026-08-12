@@ -59,6 +59,32 @@ done
 
 unset config_files
 
+# ---------------------------------------------------------------------------
+# Interactive plugins & tools (all guarded, so a fresh machine still boots).
+# Order matters:
+#   fzf-tab must load AFTER compinit but BEFORE widget-wrapping plugins.
+#   zsh-syntax-highlighting must load LAST (done near the end of this file).
+# ---------------------------------------------------------------------------
+
+# fzf: key-bindings (Ctrl-R history, Ctrl-T files) + fuzzy completion
+if command -v fzf >/dev/null 2>&1; then
+  # fzf >= 0.48 ships a single entry point; fall back to the old files.
+  if fzf --zsh >/dev/null 2>&1; then
+    source <(fzf --zsh)
+  else
+    [ -f "$BREW_PREFIX/opt/fzf/shell/key-bindings.zsh" ] && source "$BREW_PREFIX/opt/fzf/shell/key-bindings.zsh"
+    [ -f "$BREW_PREFIX/opt/fzf/shell/completion.zsh" ]  && source "$BREW_PREFIX/opt/fzf/shell/completion.zsh"
+  fi
+fi
+
+# fzf-tab: replace zsh's tab completion menu with an fzf picker
+[ -f "$BREW_PREFIX/share/fzf-tab/fzf-tab.plugin.zsh" ] && source "$BREW_PREFIX/share/fzf-tab/fzf-tab.plugin.zsh"
+[ -f "$HOME/.zsh/fzf-tab/fzf-tab.plugin.zsh" ] && source "$HOME/.zsh/fzf-tab/fzf-tab.plugin.zsh"
+
+# zoxide: smarter `cd` with frecency (you cd constantly). Use `z <partial>`
+# to jump; `cd` still works as normal.
+command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
+
 # Better history
 # Credits to https://coderwall.com/p/jpj_6q/zsh-better-history-searching-with-arrow-keys
 autoload -U up-line-or-beginning-search
@@ -88,4 +114,16 @@ export GPG_TTY
 
 export PATH="$PATH:$HOME/.local/bin"
 export WORKSPACE="$HOME/workspace"
+
+# ---------------------------------------------------------------------------
+# These two must be sourced LAST (after all other widgets are defined).
+# autosuggestions: fish-style inline suggestion from history (accept with →).
+# syntax-highlighting: colours valid/invalid commands as you type. It MUST be
+# the very last plugin sourced or it won't highlight everything correctly.
+# ---------------------------------------------------------------------------
+[ -f "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ] && \
+  source "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+[ -f "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ] && \
+  source "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+
 (( ! ${+functions[p10k]} )) || p10k finalize

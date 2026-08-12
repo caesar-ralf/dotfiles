@@ -1,6 +1,8 @@
 alias reload!='. ~/.zshrc'
 alias cls='clear' # Good 'ol Clear Screen command
 
+alias g='git'
+
 # docker aliases
 alias docker-rmi-dangling='docker rmi $(docker images -q -f dangling=true)'
 alias docker-clean='docker rm -f $(docker ps -aq); docker-rmi-dangling'
@@ -10,11 +12,38 @@ alias docker-remote-images="curl -s 'https://hub.int.klarna.net/v2/_catalog?n=10
 alias intellij='open -a "IntelliJ IDEA"'
 alias gw=./gradlew
 
+# maven wrapper shortcuts
+alias mw='./mvnw'
+alias mws='./mvnw spotless:apply'        # format code
+alias mwv='./mvnw clean verify'          # full build + tests
+alias mwi='./mvnw clean install -DskipTests'
+
+# kubernetes shortcuts
+alias k='kubectl'
+alias kgp='kubectl get pods'
+alias kga='kubectl get all'
+alias kl='kubectl logs'
+alias kns='kubectl config set-context --current --namespace' # kns <namespace>
+command -v kubectx >/dev/null 2>&1 && alias kx='kubectx'
+command -v kubens  >/dev/null 2>&1 && alias kn='kubens'
+
 # tool replacing
 alias du='ncdu --color dark -rr -x --exclude .git --exclude node_modules'
 alias help='tldr'
 alias ping='prettyping --nolegend'
 alias preview="fzf --preview 'bat --color \"always\" {}'"
+
+# modern CLI replacements
+if command -v eza >/dev/null 2>&1; then
+  alias ls='eza --group-directories-first'
+  alias l='eza -lah --group-directories-first --git'
+  alias ll='eza -l --group-directories-first --git'
+  alias la='eza -a --group-directories-first'
+  alias lt='eza --tree --level=2'
+fi
+command -v bat      >/dev/null 2>&1 && alias catp='bat --paging=never'
+command -v rg       >/dev/null 2>&1 && alias ack='rg'      # keep muscle memory, better engine
+command -v lazygit  >/dev/null 2>&1 && alias lg='lazygit'
 
 # add support for ctrl+o to open selected file in VS Code
 export FZF_DEFAULT_OPTS="--bind='ctrl-o:execute(code {})+abort'"
@@ -43,9 +72,6 @@ alias yeet='rm -rf'
 # polite
 alias please='sudo'
 
-# mvn wrapper
-alias mw='./mvnw'
 
 # goto
 alias goto='cd -P'
-
