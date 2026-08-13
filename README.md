@@ -67,7 +67,13 @@ Run any of them with `-h`/`--help` for usage.
 Wired up (and sourced in the right order) by [`zsh/zshrc.symlink`](zsh/zshrc.symlink),
 all guarded so a fresh machine still boots if something is missing:
 
-- **fzf** — `Ctrl-R` history search, `Ctrl-T` file picker, fuzzy completion.
+- **fzf** — `Ctrl-T` file picker, `Alt-C` cd, fuzzy completion (and it powers the
+  `git/*` helpers). `Ctrl-R` history is handled by **atuin** (below).
+- **atuin** — SQLite-backed shell history with context-aware search (filter by
+  directory, exit code, session; optional end-to-end-encrypted sync). It owns
+  `Ctrl-R` (loaded after fzf so it wins the binding) and is started with
+  `--disable-up-arrow`, so the arrow-key history search still works. Import
+  existing history any time with `atuin import auto`.
 - **fzf-tab** — replaces the tab-completion menu with an `fzf` picker. It is not
   in Homebrew core, so [`fzf-tab/install.sh`](fzf-tab/install.sh) clones it into
   `~/.zsh/fzf-tab` (run automatically by `script/install`).

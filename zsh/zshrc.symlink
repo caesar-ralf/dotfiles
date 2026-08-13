@@ -60,7 +60,8 @@ unset config_files
 #   zsh-syntax-highlighting must load LAST (done near the end of this file).
 # ---------------------------------------------------------------------------
 
-# fzf: key-bindings (Ctrl-R history, Ctrl-T files) + fuzzy completion
+# fzf: key-bindings (Ctrl-T files, Alt-C cd) + fuzzy completion. Ctrl-R history
+# is handled by atuin below (loaded after fzf so it wins that binding).
 if command -v fzf >/dev/null 2>&1; then
   # fzf >= 0.48 ships a single entry point; fall back to the old files.
   if fzf --zsh >/dev/null 2>&1; then
@@ -74,6 +75,13 @@ fi
 # fzf-tab: replace zsh's tab completion menu with an fzf picker
 [ -f "$BREW_PREFIX/share/fzf-tab/fzf-tab.plugin.zsh" ] && source "$BREW_PREFIX/share/fzf-tab/fzf-tab.plugin.zsh"
 [ -f "$HOME/.zsh/fzf-tab/fzf-tab.plugin.zsh" ] && source "$HOME/.zsh/fzf-tab/fzf-tab.plugin.zsh"
+
+# atuin: SQLite-backed shell history with context-aware search (cwd, exit code,
+# duration, optional E2E sync). It OWNS Ctrl-R and is loaded AFTER fzf so it
+# wins that binding; --disable-up-arrow leaves the arrow-key history search
+# (configured below) untouched. fzf still handles Ctrl-T, completion and the
+# git/* fzf helpers.
+command -v atuin >/dev/null 2>&1 && eval "$(atuin init zsh --disable-up-arrow)"
 
 # zoxide: smarter `cd` with frecency (you cd constantly). Use `z <partial>`
 # to jump; `cd` still works as normal.
