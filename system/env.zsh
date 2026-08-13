@@ -1,6 +1,12 @@
 export EDITOR='vim'
 export GITHUB_USER='caesar-ralf'
 
+# Syntax-highlighted man pages via bat (falls back to default pager if absent).
+if command -v bat >/dev/null 2>&1; then
+    export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+    export MANROFFOPT='-c'
+fi
+
 # --- Secrets ---------------------------------------------------------------
 # NEVER hard-code secrets in this file: it is committed to git.
 #

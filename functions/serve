@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# serve -- serve the current directory over HTTP.
+#
+# Usage: serve [port]   (default: 8000)
+#
+# Requires: python3.
+#
+serve () {
+    _port="${1:-8000}"
+    echo "Serving $(pwd) at http://localhost:${_port}  (Ctrl-C to stop)"
+    python3 -m http.server "$_port"
+}

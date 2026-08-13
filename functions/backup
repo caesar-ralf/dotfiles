@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# backup -- copy each file to <file>.YYYYmmdd-HHMMSS.bak next to it.
+#
+# Usage: backup <file> [file ...]
+#
+backup () {
+    if [ $# -eq 0 ]; then
+        echo "Usage: backup <file> [file ...]" >&2
+        return 1
+    fi
+    _stamp="$(date +%Y%m%d-%H%M%S)"
+    for _f in "$@"; do
+        if cp -a -- "$_f" "${_f}.${_stamp}.bak"; then
+            echo "backed up ${_f} -> ${_f}.${_stamp}.bak"
+        fi
+    done
+}

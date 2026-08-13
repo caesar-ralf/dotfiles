@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# dsh -- fuzzy pick a running Docker container and open a shell inside it.
+#
+# Usage: dsh [shell]
+#
+#   shell   command to run (default: bash if present, else sh)
+#
+# Requires: docker, fzf.
+#
+dsh () {
+    _row="$(docker ps --format '{{.ID}}  {{.Names}}  {{.Image}}' \
+        | fzf --height=40% --reverse --prompt='container> ')"
+    [ -z "$_row" ] && return 1
+    _id="$(printf '%s' "$_row" | awk '{print $1}')"
+
+    if [ -n "$1" ]; then
+        docker exec -it "$_id" "$1"
+    else
+        docker exec -it "$_id" sh -c 'command -v bash >/dev/null 2>&1 && exec bash || exec sh'
+    fi
+}

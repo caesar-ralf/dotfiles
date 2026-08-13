@@ -55,6 +55,10 @@ so each file name becomes a command:
 | `jarpeek <jar> …`   | List/grep jar entries, `-x` print an entry, `-c` `javap` a class.        |
 | `klog [-n ns] [-f]` | Fuzzy-pick a Kubernetes pod with `fzf` and tail its logs.                |
 | `volvo-jwt-token`   | Print the `sub` claim of a fresh Volvo ID token (`-e qa\|prod`).         |
+| `killport <port>`   | Kill whatever is listening on a TCP port (`-9` for SIGKILL).             |
+| `serve [port]`      | Serve the current directory over HTTP (default `8000`).                  |
+| `dsh [shell]`       | Fuzzy-pick a running Docker container and open a shell in it.            |
+| `backup <file> …`   | Copy each file to `<file>.YYYYmmdd-HHMMSS.bak` next to it.               |
 
 Run any of them with `-h`/`--help` for usage.
 
@@ -68,6 +72,13 @@ all guarded so a fresh machine still boots if something is missing:
   in Homebrew core, so [`fzf-tab/install.sh`](fzf-tab/install.sh) clones it into
   `~/.zsh/fzf-tab` (run automatically by `script/install`).
 - **zoxide** — frecency-based `cd`; jump with `z <partial>`.
+- **direnv** — per-directory environment variables. Drop an `.envrc` in a project,
+  run `direnv allow`, and its env loads on `cd` in and unloads on the way out.
+  Hooked in [`direnv/init.zsh`](direnv/init.zsh).
+- **eza icons** — the `ls`/`l`/`ll`/`la`/`lt` aliases pass `--icons=auto`, so
+  file-type glyphs show up (thanks to the Nerd Font).
+- **bat man pages** — `MANPAGER` uses `bat` for syntax-highlighted `man` output
+  (see [`system/env.zsh`](system/env.zsh)).
 - **oh-my-posh** — the prompt theme engine. The theme is vendored in this repo at
   [`oh-my-posh/theme.omp.json`](oh-my-posh/theme.omp.json) and applied
   automatically on shell start by [`zsh/zshrc.symlink`](zsh/zshrc.symlink) — no

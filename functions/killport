@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# killport -- kill whatever process is listening on a TCP port.
+#
+# Usage: killport <port> [-9]
+#
+#   -9   send SIGKILL instead of the default SIGTERM
+#
+# Requires: lsof.
+#
+killport () {
+    if [ $# -eq 0 ]; then
+        echo "Usage: killport <port> [-9]" >&2
+        return 1
+    fi
+    _port="$1"
+    _sig="TERM"
+    [ "$2" = "-9" ] && _sig="KILL"
+    _pids="$(lsof -ti "tcp:${_port}" 2>/dev/null)"
+    if [ -z "$_pids" ]; then
+        echo "Nothing is listening on port ${_port}." >&2
+        return 1
+    fi
+    echo "Killing on :${_port} (SIG${_sig}) -> ${_pids}"
+    echo "$_pids" | xargs kill -s "$_sig"
+}

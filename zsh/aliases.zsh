@@ -36,11 +36,11 @@ alias preview="fzf --preview 'bat --color \"always\" {}'"
 
 # modern CLI replacements
 if command -v eza >/dev/null 2>&1; then
-  alias ls='eza --group-directories-first'
-  alias l='eza -lah --group-directories-first --git'
-  alias ll='eza -l --group-directories-first --git'
-  alias la='eza -a --group-directories-first'
-  alias lt='eza --tree --level=2'
+  alias ls='eza --group-directories-first --icons=auto'
+  alias l='eza -lah --group-directories-first --git --icons=auto'
+  alias ll='eza -l --group-directories-first --git --icons=auto'
+  alias la='eza -a --group-directories-first --icons=auto'
+  alias lt='eza --tree --level=2 --icons=auto'
 fi
 command -v bat      >/dev/null 2>&1 && alias catp='bat --paging=never'
 # ripgrep (rg): recursive, gitignore aware, very fast. Replaces grep and ack.
