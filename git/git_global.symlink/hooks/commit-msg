@@ -1,74 +1,68 @@
 #!/bin/sh
-##
-# DESCRIPTION:
 #
-# Script to be used as commit hook that will extract ticket number from the branch name
-# and add it to the end of your commit msg. The script expects the JIRA ticket to follow
-# the format of PROJECTSYMBOL-TICKETNUMBER.
+# commit-msg hook: append the JIRA ticket parsed from the branch name.
 #
-# For example, after adding this to your commit-hooks you can create branchs with names 
-# like:
+# A branch named like `WEAV-1234.short.description` (or WEAV-1234-...) gets the
+# ticket `WEAV-1234` appended to the commit message, unless the message already
+# references a ticket. Protected branches, a detached HEAD, and merges are
+# skipped.
 #
-# ```
-# git checkout -b WEAV-1234-some-description
-# ````
-# 
-# and the script will add WEAV-1234 to end of your commit messages.
+# Create branches with the ticket in the name, e.g.
+#   git switch -c WEAV-1234.some.description
+#
+# Override the pattern per repo if your keys differ:
+#   git config hooks.ticketPattern '[A-Z][A-Z0-9]+-[0-9]+'
 
-## flags
-# Exit on error. Append "|| true" if you expect an error.
-set -o errexit
-# Exit on error inside any functions or subshells.
-set -o errtrace
-# Catch the error in case pipe fails
-set -o pipefail
-# Turn on traces, turn own by adding DEBUG=true to environment variables
-[[ "${DEBUG}" = true ]] && set -o xtrace
+set -eu
 
-## functions
-get_current_branch_name() {
-    git symbolic-ref HEAD | sed 's!refs\/heads\/!!'
-}
-info() {
-    printf "  [\033[00;34mINFO\033[0m] $1\n"
-}
-warn() {
-    printf "  [\033[00;33mWARN\033[0m] $1\n"
-}
+MSG_FILE="$1"
 
-extract_jira_ticket() {
-    echo $1 | grep -E '[A-Z]{4,}-[0-9]+' -o | head -n1 || echo ""
-}
-
-## main
-# extract jira ticket from commit message
-branch_name="$(get_current_branch_name)"
-
-# if we are in master/main, just exit as we won't have a ticket number
-[ "$branch_name" == "master" ] || [ "$branch_name" == "main" ] && exit 0
-
-message="$(cat $1 | grep -v '^#')"
-ticket=$(extract_jira_ticket "$message")
-
-# if no jira ticket number was found
-if [ -z "$ticket" ];
-  then
-    # try to extract jira ticket number from branch name
-    ticket="$(extract_jira_ticket "$branch_name")"
-
-    if [ ! ${message:0:1} == "\n" ]
-    then
-        if [ -n "$ticket" ]
-        # add if there is a ticket number on the branch, just add it to the commit msg
-        then
-            info "Adding ticket number '\033[0;36m$ticket\033[0m' to commit message: "
-            echo "$message\n\n$ticket\n" > "$1"
-        else
-            warn "No ticket number was found to be added to commit message!"
-            warn "Remember to either add it by yourself or create the branch using the ticket number."
-            warn "Example: \033[0;32mgit checkout -b WEAV-1235-branch-with-jira-ticket-number\033[0m\n"
-        fi
-    fi
-  else
-    info "Ticket number '\033[0;36m$ticket\033[0m' was already added to commit message"
+# Colours only when stderr is a terminal.
+if [ -t 2 ]; then
+    C_INFO='\033[0;34m'; C_WARN='\033[0;33m'; C_KEY='\033[0;36m'; C_OK='\033[0;32m'; C_RST='\033[0m'
+else
+    C_INFO=''; C_WARN=''; C_KEY=''; C_OK=''; C_RST=''
 fi
+info() { printf "  ${C_INFO}INFO${C_RST}: %b\n" "$1" >&2; }
+warn() { printf "  ${C_WARN}WARN${C_RST}: %b\n" "$1" >&2; }
+
+# Skip merge commits (message comes from MERGE_MSG, ticket is not wanted).
+if [ -f "$(git rev-parse --git-path MERGE_HEAD 2>/dev/null)" ]; then
+    exit 0
+fi
+
+# The pattern JIRA keys follow: 2+ leading letters, digits, dash, number.
+PATTERN="$(git config --get hooks.ticketPattern 2>/dev/null || printf '%s' '[A-Z][A-Z0-9]+-[0-9]+')"
+extract() { printf '%s' "$1" | grep -Eo "$PATTERN" | head -n1 || true; }
+
+# Current branch name (empty on a detached HEAD).
+branch="$(git symbolic-ref --quiet --short HEAD || true)"
+
+# Nothing to do on a detached HEAD or on protected branches.
+case "$branch" in
+    ''|main|master|develop|dev|release|release/*|hotfix/*)
+        exit 0 ;;
+esac
+
+# Real message: everything above the verbose scissors line, comments removed.
+scissors='# ------------------------ >8 ------------------------'
+message="$(sed "/^${scissors}\$/,\$d" "$MSG_FILE" | grep -v '^#' || true)"
+
+# If the message already references a ticket, leave it untouched.
+if [ -n "$(extract "$message")" ]; then
+    info "Ticket already present. Leaving the message untouched."
+    exit 0
+fi
+
+ticket="$(extract "$branch")"
+if [ -z "$ticket" ]; then
+    warn "No JIRA ticket found in branch ${C_KEY}${branch}${C_RST}."
+    warn "Add one yourself, or name branches like ${C_OK}WEAV-1234.short.description${C_RST}."
+    exit 0
+fi
+
+# Drop trailing blank lines, then append the ticket as its own footer line.
+trimmed="$(printf '%s\n' "$message" | awk 'NF{last=NR} {line[NR]=$0} END{for(i=1;i<=last;i++) print line[i]}')"
+printf '%s\n\n%s\n' "$trimmed" "$ticket" > "$MSG_FILE"
+
+info "Added ticket ${C_KEY}${ticket}${C_RST} to the commit message."

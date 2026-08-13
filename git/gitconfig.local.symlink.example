@@ -1,5 +1,9 @@
 [user]
         name = AUTHORNAME
         email = AUTHOREMAIL
+        # Per-machine commit-signing key (kept out of the shared config).
+        # For SSH signing (see [gpg] format = ssh in gitconfig.symlink), paste
+        # your PUBLIC key here, e.g.:
+        # signingkey = ssh-ed25519 AAAA...yourpublickey...
 [credential]
         helper = GIT_CREDENTIAL_HELPER

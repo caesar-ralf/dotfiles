@@ -1,143 +1,219 @@
-# Local/private config goes in the include
+# Shared git config. Machine/identity specific bits (name, email, credential
+# helper, signing key) live in ~/.gitconfig.local, included first below.
 [include]
     path = ~/.gitconfig.local
 [hub]
     protocol = https
+
+# ===========================================================================
+# Aliases. List them any time with `git aliases`.
+# ===========================================================================
 [alias]
-    co = checkout
-    promote = !$DOTFILES/bin/git-promote
-    wtf     = !$DOTFILES/bin/git-wtf
-    rank-contributors = !$DOTFILES/bin/git-rank-contributors
-    count   = !git shortlog -sn
+    # --- shortcuts ----------------------------------------------------------
+    co  = checkout
     cob = checkout -b
-    ci = commit
-    st = status -s
-    br = branch
-    # different ways to show our commits, depending on what we are looking for
-    ls = log --pretty=format:\"%C(yellow)%h%Cred%d %Creset%s%Cblue [%cn]\" --decorate
-    ll = log --pretty=format:\"%C(yellow)%h%Cred%d %Creset%s%Cblue [%cn]\" --decorate --numstat
+    sw  = switch                    # modern branch switch
+    swc = switch -c                 # create and switch to a new branch
+    res = restore                   # discard working tree changes to a file
+    unstage = restore --staged      # unstage a file. keeps your changes
+    ci  = commit
+    a   = add
+    aa  = add --all
+    ap  = add --patch               # stage hunks interactively
+    br  = branch
+    st  = status -s
+    stat = status -sb               # short status plus ahead/behind
+
+    # --- log and history ----------------------------------------------------
+    ls  = log --pretty=format:\"%C(yellow)%h%Cred%d %Creset%s%Cblue [%cn]\" --decorate
+    ll  = log --pretty=format:\"%C(yellow)%h%Cred%d %Creset%s%Cblue [%cn]\" --decorate --numstat
     lnc = log --pretty=format:\"%h %s [%cn]\"
-    # Show changes that have been staged
-    diffc = diff --cached
-    # saves all updates as Working in Progress. USE WITH CARE!
-    wip = !git add -u && git commit -m "WIP"
-    # remove a file from staging
-    unstage = reset HEAD --
-    # show what the last commit has
-    last = log -1 HEAD
-    # list all aliases that we added :D
-    list-aliases = !git config -l | grep alias | cut -c 7-
-    # remove last commit
-    undo-commit = reset --soft HEAD~
-    # Shows current branch-name. Useful for other aliases.
+    last = log -1 HEAD --stat        # what the last commit changed
+    lo  = log --oneline -20          # quick scannable list
+    # pretty commit graph of the current branch. use `lga` for all branches
+    lg  = log --graph --abbrev-commit --decorate \
+        --format=format:\"%C(bold blue)%h%C(reset) %C(green)(%ar)%C(reset)%C(auto)%d%C(reset) %s %C(dim white)· %an%C(reset)\"
+    lga = log --graph --abbrev-commit --decorate --all \
+        --format=format:\"%C(bold blue)%h%C(reset) %C(green)(%ar)%C(reset)%C(auto)%d%C(reset) %s %C(dim white)· %an%C(reset)\"
+    # what have I been up to?
+    today   = "!git log --since=midnight --oneline --author=\"$(git config user.name)\""
+    standup = "!git log --since='yesterday' --oneline --author=\"$(git config user.name)\""
+    # search commits whose diff adds or removes a string.  git search <text>
+    search  = "!f() { git log --oneline -S\"$1\"; }; f"
+    # full history of a single file, following renames.  git filelog <path>
+    filelog = log -p --follow
+
+    # --- diff ---------------------------------------------------------------
+    diffc = diff --cached            # what is staged
+    ds    = diff --staged            # same thing, nicer name
+    dw    = diff --word-diff         # word level diff
+    dft   = difftool
+
+    # --- branches -----------------------------------------------------------
     branch-name = !git rev-parse --abbrev-ref HEAD
-    # Push the current branch to the remote "origin", and set it to track
-    # the upstream branch
-    publish = "!git push -u origin $(git branch-name)"
-    # Delete the remote version of the current branch
-    unpublish = "!git push origin :$(git branch-name)"
-    # Remove already merged branches
+    # detect the remote default branch (main or master), else fall back to main
+    default-branch = "!git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo main"
+    # jump to the default branch and fast forward it
+    main = "!git switch $(git default-branch) && git pull --ff-only"
+    branches = branch -a
+    # branches you touched most recently, newest first
+    recent = "!git for-each-ref --sort=-committerdate refs/heads/ --format='%(color:yellow)%(refname:short)%(color:reset) %(color:green)(%(committerdate:relative))%(color:reset) %(contents:subject)' --count=15"
+    # delete local branches whose upstream is gone (merged or deleted on origin)
     cleanup = "!f() { git fetch --all --prune; git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -D; }; f"
-    # your basic amend
+
+    # --- committing and fixing ---------------------------------------------
     amend = commit --amend
     forgot-something-2-commit = commit --amend --no-edit
-    stash-unapply = !git stash show -p | git apply -R
-    # pull & cleanup
-    update = "!git pull && git cleanup"
-    # GRaphical lOG
-    grog = log --graph --abbrev-commit --decorate --all --format=format:\"%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(dim white) - %an%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n %C(white)%s%C(reset)\"
-    # stash only untracked files
-    stsh = stash --keep-index
-    # stash including untracked, but not new
-    staash = stash --include-untracked
-    # stash EVERYTHING!
-    staaash = stash --all
-    # push asking nicelly
-    please = push --force-with-lease
-    # pretty log
-    lg = log --graph --abbrev-commit --decorate --all \
-        --format=format:\"%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(dim white) \
-        - %an%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n %C(white)%s%C(reset)\"
-    # diff tool
-    dft = difftool
-# Use a pager for large output, just like other git commands.
-[pager]
-    difftool = true
-[push]
-    default = simple
+    reword = commit --amend --only   # edit just the last commit message
+    wip  = !git add -u && git commit -m "WIP"
+    save = !git add -A && git commit -m "SAVEPOINT"
+    undo-commit = reset --soft HEAD~ # undo last commit, keep changes staged
+    uncommit    = reset --soft HEAD~
+    # nuke ALL local changes and untracked files. danger!
+    nevermind = "!git reset --hard HEAD && git clean -df"
+
+    # --- stash: name them and manage them, not the --keep-index dance -------
+    ss  = stash push -m              # stash WITH a message.  git ss "wip parser"
+    ssu = stash push -u -m           # also including untracked files
+    sl  = stash list
+    sp  = stash pop                  # re apply newest and drop it
+    sa  = stash apply                # re apply but keep it in the list
+    sd  = stash drop                 # delete a stash.  git sd 'stash@{1}'
+    # snapshot: save everything but keep it in your working tree too
+    snapshot = "!git stash push -m \"snapshot $(date +%Y-%m-%d_%H-%M-%S)\" && git stash apply"
+
+    # --- remote and sync ----------------------------------------------------
+    please    = push --force-with-lease
+    pf        = push --force-with-lease
+    publish   = "!git push -u origin $(git branch-name)"
+    unpublish = "!git push origin :$(git branch-name)"
+    update    = "!git pull --rebase --autostash && git cleanup"
+    sync      = "!git pull --rebase --autostash && git push"
+
+    # --- info ---------------------------------------------------------------
+    who   = shortlog -sn --no-merges
+    count = !git shortlog -sn
+    tags  = tag -l --sort=-version:refname
+    remotes = remote -v
+    aliases = "!git config --get-regexp ^alias\\. | cut -c 7- | sort"
+    list-aliases = !git config -l | grep alias | cut -c 7-
+
+# ===========================================================================
+# Core, init, identity
+# ===========================================================================
+[core]
+    excludesfile = ~/.gitignore
+    pager = delta
+    autocrlf = input
+    # speed up status and diff on big repos using the filesystem monitor
+    fsmonitor = true
+    untrackedCache = true
 [init]
     templatedir = ~/.git_global
     defaultBranch = main
-[core]
-    excludesfile = ~/.gitignore
-	pager = delta
-	autocrlf = input
-[filter "lfs"]
-	smudge = git-lfs smudge -- %f
-	process = git-lfs filter-process
-    required = true
-    clean = git-lfs clean -- %f
+[commit]
+    gpgsign = true
+    # show the staged diff in the commit message editor for a final review
+    verbose = true
+[tag]
+    gpgsign = false
+    # newest or highest version tags first
+    sort = version:refname
+[column]
+    ui = auto                        # multi column output for branch, tag, etc.
+[help]
+    autocorrect = prompt             # ask before running a corrected command
+
+# ===========================================================================
+# Fetch, push, pull, rebase, merge
+# ===========================================================================
+[push]
+    default = simple
+    # first push of a new branch creates its upstream automatically
+    autoSetupRemote = true
+    followTags = true                # push annotated tags along with commits
+[pull]
+    rebase = true
+[fetch]
+    prune = true
+    prunetags = true
+    fsckobjects = true
+    writeCommitGraph = true          # keeps `git log --graph` fast
 [branch]
     autosetuprebase = always
     sort = -committerdate
-[lfs]
-    locksverify = false
-[submodule]
-    recurse = true
+[rebase]
+    autosquash = true
+    autostash = true
+    updateRefs = true                # keep stacked branches pointing correctly
+[merge]
+    conflictStyle = zdiff3           # clearer 3 way conflict markers
+[rerere]
+    enabled = true                   # remember and replay conflict resolutions
+
+# ===========================================================================
+# Diff and merge tooling. delta for paging, difftastic for structural diffs
+# ===========================================================================
 [diff]
-    # https://difftastic.wilfred.me.uk/
-    tool = difftastic
-    # handles functions being reordered: https://luppeng.wordpress.com/2020/10/10/when-to-use-each-of-the-git-diff-algorithms/
+    tool = difftastic                # https://difftastic.wilfred.me.uk
+    # histogram handles reordered functions well
     algorithm = histogram
-    # uses different colours to highlight lines in diffs that have been “moved”
-    colorMoved = default
-    # ignores indentation changes
+    colorMoved = default             # colour lines that only moved
     colorMovedWS = allow-indentation-change
+    renames = copies                 # detect renames and copies
+    mnemonicPrefix = true            # i/w/c/o prefixes instead of a/b
+    wsErrorHighlight = all           # highlight whitespace errors
     submodule = log
 [difftool]
     prompt = false
 [difftool "difftastic"]
     cmd = difft "$LOCAL" "$REMOTE"
-[merge]
-	conflictStyle = zdiff3
-[rebase]
-    autosquash = true
-    autostash = true
-[pull]
-    rebase = true
-[rerere]
-    enabled = true
-[help]
-    autocorrect = 1
-# fix URLs that I mistakenly cloned using the HTTP
+[pager]
+    difftool = true
+[interactive]
+    diffFilter = delta --color-only
+[delta]
+    navigate = true                  # n and N to jump between files
+    line-numbers = true
+    hyperlinks = true                # clickable file and commit links
+
+# ===========================================================================
+# Log, status
+# ===========================================================================
+[log]
+    date = iso
+    follow = true                    # `git log <file>` follows renames
+[status]
+    submoduleSummary = true
+
+# ===========================================================================
+# Signing (ssh via 1Password), credentials, url rewrites
+# ===========================================================================
+[gpg]
+    format = ssh
+[gpg "ssh"]
+    program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+[credential "https://gitlab.oss.volvoc3.com"]
+    username = cfranzho
+# use ssh instead of https for github and gists that I cloned over http
 [url "git@github.com:"]
     insteadOf = "https://github.com/"
 [url "git@gist.github.com:"]
     insteadOf = https://gist.github.com/
+
+# ===========================================================================
+# Submodules, lfs, and object integrity (security)
+# ===========================================================================
+[submodule]
+    recurse = true
+[lfs]
+    locksverify = false
+[filter "lfs"]
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+    clean = git-lfs clean -- %f
 [transfer]
     fsckobjects = true
-[fetch]
-    fsckobjects = true
-    prune = true
 [receive]
     fsckobjects = true
-[log]
-    date = iso
-[status]
-    submoduleSummary = true
-[interactive]
-	diffFilter = delta --color-only
-[delta]
-	navigate = true
-[gpg]
-	format = ssh
-[gpg "ssh"]
-	program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
-[commit]
-	gpgsign = true
-[user]
-	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEM/Nysjlp6nVFqp9vyzaZ49IiHthuw/VWQ0QnOmNnmW
-[credential "https://gitlab.oss.volvoc3.com"]
-	username = cfranzho
-[tag]
-	gpgsign = false
