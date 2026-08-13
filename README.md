@@ -33,9 +33,14 @@ Aliases live next to the topic they belong to:
   replacements like `eza`/`rg`/`lazygit` that only activate when installed).
 - [`system/aliases.zsh`](system/aliases.zsh) — `ls`/`l`/`ll`/`la` (via `gls`,
   overridden by `eza` when present).
-- [`git/aliases.zsh`](git/aliases.zsh) — `jira` fuzzy branch checkout. Most git
-  shortcuts are git aliases in [`git/gitconfig.symlink`](git/gitconfig.symlink)
-  (`co`, `st`, `lg`, `please`, `cleanup`, …).
+- [`git/aliases.zsh`](git/aliases.zsh) — fzf-powered git helpers: `jira`/`gcoa`
+  (fuzzy checkout a branch), `gco` (local branch), `gbd` (fuzzy-delete branches),
+  `gshow` (browse commits with preview), `gfixup` (pick a commit to `--fixup` +
+  autosquash). Most git shortcuts are git aliases in
+  [`git/gitconfig.symlink`](git/gitconfig.symlink): everyday ones (`co`, `st`,
+  `lg`, `please`, `cleanup`, `sync`, `main`, `recent`), history helpers
+  (`today`, `standup`, `search`, `filelog`), and "oops" fixes (`amend`,
+  `undo-commit`, `nevermind`). Run `git aliases` to list them all.
 
 ## Custom functions
 

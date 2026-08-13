@@ -28,7 +28,8 @@ command -v kubectx >/dev/null 2>&1 && alias kx='kubectx'
 command -v kubens  >/dev/null 2>&1 && alias kn='kubens'
 
 # tool replacing
-alias du='ncdu --color dark -rr -x --exclude .git --exclude node_modules'
+# dust (https://github.com/bootandy/dust): a fast, tree view `du`.
+command -v dust >/dev/null 2>&1 && alias du="dust -X .git -X node_modules"
 alias help='tldr'
 alias ping='prettyping --nolegend'
 alias preview="fzf --preview 'bat --color \"always\" {}'"
@@ -42,12 +43,14 @@ if command -v eza >/dev/null 2>&1; then
   alias lt='eza --tree --level=2'
 fi
 command -v bat      >/dev/null 2>&1 && alias catp='bat --paging=never'
-command -v rg       >/dev/null 2>&1 && alias ack='rg'      # keep muscle memory, better engine
+# ripgrep (rg): recursive, gitignore aware, very fast. Replaces grep and ack.
+command -v rg       >/dev/null 2>&1 && alias grep='rg'    # rg <pattern> [path]
+command -v rg       >/dev/null 2>&1 && alias ack='rg'     # keep muscle memory, better engine
 command -v lazygit  >/dev/null 2>&1 && alias lg='lazygit'
 
 # add support for ctrl+o to open selected file in VS Code
 export FZF_DEFAULT_OPTS="--bind='ctrl-o:execute(code {})+abort'"
-alias top='sudo htop'
+alias top='sudo btop'
 
 # dir aliases
 alias ..='cd ..'

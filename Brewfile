@@ -25,8 +25,9 @@ brew 'fd'                                      # modern `find` (simpler syntax, 
 brew 'ripgrep'                                 # modern `grep`/`ack` (rg) — very fast code search
 brew 'ack'                                     # older grep-like source search (kept for habit)
 brew 'zoxide'                                  # smarter `cd` with frecency (`z <partial>`)
+brew 'dust'                                     # modern `du` (bootandy/dust): instant tree of what's big
 brew 'ncdu'                                    # interactive disk-usage analyser (TUI)
-brew 'htop'                                    # interactive process viewer
+brew 'btop'                                    # interactive process/resource monitor (modern top/htop)
 brew 'prettyping'                              # prettier `ping` output
 brew 'tldr'                                    # simplified, example-driven man pages
 brew 'wget'                                    # download files over HTTP/FTP
