@@ -14,6 +14,7 @@ brew 'zsh-syntax-highlighting'                 # colours commands as you type (s
 brew 'fzf'                                     # fuzzy finder (Ctrl-R history, Ctrl-T files)
 brew 'grc'                                     # generic colouriser for command output
 brew 'direnv'                                  # auto-load per-directory environment variables
+brew 'tree'                                    # visualization of folder structures as tree
 
 # =============================================================================
 # Modern CLI replacements & terminal utilities
