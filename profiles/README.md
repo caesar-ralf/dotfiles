@@ -39,7 +39,7 @@ profiles/<name>/
   <feature>/*.zsh            # sourced at shell start, after the global files (can override)
   <feature>/completion.zsh   # sourced after compinit
   <feature>/functions/       # each file is autoloaded as a command
-  <feature>/secrets.refs     # NAME=pass://<vault>/<item>/<field>, used by `secret`/`with-secrets`
+  <feature>/secrets.refs     # NAME[:ttl]=pass://<vault>/<item>/<field>; add with `secret add NAME --feature profile:<feature>`
   <feature>/Brewfile         # installed by `dot` / script/install while active
   <feature>/install.sh       # run by `dot` / script/install while active
   <feature>/activate.sh      # run by `profile use` (e.g. link a settings file)

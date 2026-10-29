@@ -1,71 +1,265 @@
 # DOTFILES
 
-Simplified version of my dotfiles preferences. To start, just run `script/bootstrap` and it should guide you through everything.
+My macOS shell setup: zsh, git, CLI tools, apps. Company-specific config lives
+in switchable **profiles**, and secrets are fetched from **Proton Pass**.
 
-## Installing / updating
+```sh
+git clone git@github.com:caesar-ralf/dotfiles.git ~/.dotfiles
+~/.dotfiles/script/bootstrap        # guided setup, safe to re-run
+```
 
-- `script/bootstrap`: the one command to set up a fresh machine. It creates
-  `gitconfig`, symlinks every `*.symlink` file into `$HOME`, (on macOS) installs
-  all dependencies, checks your Proton Pass login, and points you at company
-  profiles. Safe to re-run; set `DOTFILES_YES=1` to auto-confirm prompts.
-- `script/dot`: periodic maintenance. Updates Homebrew and re-runs every
-  installer. Flags: `--edit` (open the repo in `$EDITOR`), `--secrets`
-  (check Proton Pass + secret references), `--no-update` (skip `brew update`), `--help`.
-- `script/install`: runs `brew bundle` against the [`Brewfile`](Brewfile) and
-  then executes **every** `*/install.sh` in the repo (Homebrew, SDKMAN, fzf-tab, …),
-  plus the active profile's `*/Brewfile` and `*/install.sh`.
-- `script/profile`: switch company profiles on/off (see [Profiles](#company-profiles)).
+- [Principles](#principles)
+- [Layout](#layout)
+- [Everyday commands](#everyday-commands)
+- [Company profiles](#company-profiles)
+- [Secrets](#secrets)
+- [SSH keys](#ssh-keys)
+- [Git, Maven](#git-maven)
+- [Aliases, functions, shell tools](#aliases-functions-shell-tools)
+- [Changing jobs checklist](#changing-jobs-checklist)
+- [Troubleshooting](#troubleshooting)
 
-All scripts share [`script/lib/common.sh`](script/lib/common.sh) for consistent,
-colourful output (colours auto-disable when piped or when `NO_COLOR` is set).
-Once the dotfiles are installed, `script/` is on your `PATH`, so you can just run
-`dot`, `bootstrap` or `profile` from anywhere.
+For AI agents and future contributors: read [`AGENTS.md`](AGENTS.md).
 
-The repo is organised **by feature**: each top-level folder is self-contained
-(its `*.zsh`, `_path.zsh`, `completion.zsh`, `install.sh`, `secrets.refs`, …),
-so removing a feature means deleting one folder. The [`Brewfile`](Brewfile)
-lists every CLI tool and GUI app, grouped by feature with a one-line comment
-explaining each entry.
+## Principles
+
+1. **Organised by feature, not by layer.** Each top-level folder holds
+   everything for one feature: shell config, PATH, completion, installer,
+   secrets it needs. Deleting a feature means deleting one folder.
+2. **Nothing company-specific is committed.** Work email, internal hosts,
+   registries and company-only commands live in a profile (a separate private
+   repo under `profiles/`).
+3. **No secrets in any repo.** Features only declare *references* to Proton
+   Pass items. Values are fetched on demand and cached in the macOS Keychain.
+4. **Fresh machines still boot.** Every tool integration is guarded, so a
+   missing tool is skipped, not an error.
+
+## Layout
+
+```
+~/.dotfiles
+├── <feature>/                 one folder per feature (git, ssh, secrets, zsh, docker, ...)
+│   ├── _path.zsh              sourced first (PATH and similar)
+│   ├── *.zsh                  sourced on shell start
+│   ├── completion.zsh         sourced after compinit
+│   ├── install.sh             run by `dot` / script/install
+│   ├── secrets.refs           secrets this feature needs (references, never values)
+│   └── *.symlink              linked into $HOME as .<name> by bootstrap
+├── functions/                 one file per command, autoloaded (extract, mkcd, klog, ...)
+├── profiles/                  company profiles; only README.md and _template/ are committed
+├── script/                    bootstrap, dot, install, profile (+ lib/common.sh)
+├── Brewfile                   global CLI tools and apps, grouped and commented
+└── AGENTS.md                  context for AI agents working on this repo
+```
+
+| Feature                                                                                      | What it holds                                                                           |
+|----------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| `zsh/`                                                                                       | `zshrc.symlink` (the loader), options, key bindings, general aliases                    |
+| `system/`                                                                                    | env vars (`env.zsh`), `ls` aliases, grc; `env.local.zsh` for git-ignored machine tweaks |
+| `git/`                                                                                       | `gitconfig.symlink`, global hooks, fzf git helpers, `GITHUB_TOKEN` reference            |
+| `secrets/`                                                                                   | `secret` and `with-secrets` (Proton Pass + Keychain cache)                              |
+| `ssh/`                                                                                       | Proton Pass SSH agent, `ssh/config` included from `~/.ssh/config`                       |
+| `m2.symlink/`                                                                                | `~/.m2`: Maven wrappers that inject secrets, `settings.xml.example`                     |
+| `functions/`                                                                                 | small standalone commands (see [below](#custom-functions))                              |
+| `oh-my-posh/`, `iterm/`, `fzf-tab/`                                                          | prompt theme, iTerm2 profile, fzf tab completion                                        |
+| `docker/`, `k9s/`, `direnv/`, `go/`, `pyenv/`, `rbenv/`, `sdkman/`, `postgres/`, `homebrew/` | per-tool PATH, init, completion, installers                                             |
+
+### How a shell starts
+
+`zsh/zshrc.symlink` (= `~/.zshrc`) collects `$DOTFILES/*/*.zsh` and then the
+active profile's `~/.config/dotfiles/profile/*/*.zsh`, and sources them in
+three passes:
+
+1. every `_path.zsh`,
+2. everything else except completions,
+3. `compinit`, then every `completion.zsh`.
+
+Profile files come after global files in each pass, so a profile can override
+anything. The globs are depth-limited on purpose: `m2.symlink/repository` holds
+over 16k directories.
+
+## Everyday commands
+
+| Command                                          | What it does                                                                           |
+|--------------------------------------------------|----------------------------------------------------------------------------------------|
+| `dot`                                            | Update Homebrew, `brew bundle`, and run every `install.sh` (global and active profile) |
+| `dot --secrets`                                  | Same as `secret status`                                                                |
+| `profile` / `profile use <name>` / `profile off` | Show / switch / disable the company profile                                            |
+| `secret list`                                    | Which secrets exist, where they're declared, how fresh the cache is                    |
+| `secret add NAME` / `secret new NAME`            | Link a secret to an existing Proton Pass item / create one                             |
+| `with-secrets -- <cmd>`                          | Run a command with secrets in its environment                                          |
+| `reload!`                                        | Re-source `~/.zshrc` (`exec zsh` is cleaner)                                           |
 
 ## Company profiles
 
-Nothing company-specific is committed here. Work email, internal hosts, package
-registries and company-only commands live in a **profile**: `profiles/<name>/`,
-a separate **private** git repo that this repo ignores. It uses the same
-one-folder-per-feature layout.
+A profile is everything specific to one employer or client. It lives in
+`profiles/<name>/`, which is **its own private git repo**; this repo ignores
+it. Inside, it uses the same one-folder-per-feature layout, plus a few extras.
 
 ```sh
-profile list                # available profiles (* = active)
-profile use acme            # activate / switch
-profile off                 # deactivate
-profile new acme            # start one from profiles/_template
-profile clone <url>         # fetch an existing private profile repo
+profile                     # active profile and its features
+profile list                # all profiles (* = active)
+profile new acme            # scaffold profiles/acme from profiles/_template (git init)
+profile clone <url> [name]  # fetch an existing private profile repo
+profile use acme            # activate (switches if another is active), runs */activate.sh
+profile off                 # deactivate, runs */deactivate.sh
 ```
 
-See [`profiles/README.md`](profiles/README.md) for the layout and hooks.
+Then run `exec zsh`. Run `dot` if the profile ships a `Brewfile` or `install.sh`.
 
-## Aliases
+The active profile is a symlink: `~/.config/dotfiles/profile -> profiles/<name>`.
+Everything else follows from it:
 
-Aliases live next to the topic they belong to:
+| Profile file                                     | Effect while active                                                    |
+|--------------------------------------------------|------------------------------------------------------------------------|
+| `<feature>/*.zsh`, `_path.zsh`, `completion.zsh` | sourced by `~/.zshrc` after the global ones                            |
+| `<feature>/functions/*`                          | autoloaded as commands                                                 |
+| `git/gitconfig`                                  | included **last** by `git/gitconfig.symlink` (work email, credentials) |
+| `ssh/config`                                     | included by `ssh/config` (company hosts)                               |
+| `<feature>/secrets.refs`                         | used by `secret` / `with-secrets`; overrides global names              |
+| `<feature>/Brewfile`, `install.sh`               | run by `dot`                                                           |
+| `<feature>/activate.sh`, `deactivate.sh`         | run by `profile use` / `profile off` (e.g. link `~/.m2/settings.xml`)  |
 
-- [`zsh/aliases.zsh`](zsh/aliases.zsh) — general shortcuts (`g`=git, `k`=kubectl,
-  Maven wrappers `mw`/`mws`/`mwv`, directory jumps `..`/`...`, and modern-tool
-  replacements like `eza`/`rg`/`lazygit` that only activate when installed).
-- [`system/aliases.zsh`](system/aliases.zsh) — `ls`/`l`/`ll`/`la` (via `gls`,
-  overridden by `eza` when present).
-- [`git/aliases.zsh`](git/aliases.zsh) — fzf-powered git helpers: `jira`/`gcoa`
-  (fuzzy checkout a branch), `gco` (local branch), `gbd` (fuzzy-delete branches),
-  `gshow` (browse commits with preview), `gfixup` (pick a commit to `--fixup` +
-  autosquash). Most git shortcuts are git aliases in
-  [`git/gitconfig.symlink`](git/gitconfig.symlink): everyday ones (`co`, `st`,
-  `lg`, `please`, `cleanup`, `sync`, `main`, `recent`), history helpers
-  (`today`, `standup`, `search`, `filelog`), and "oops" fixes (`amend`,
-  `undo-commit`, `nevermind`). Run `git aliases` to list them all.
+Details and the hook environment are in [`profiles/README.md`](profiles/README.md).
 
-## Custom functions
+## Secrets
 
-Files in [`functions/`](functions) are autoloaded (see [`zsh/config.zsh`](zsh/config.zsh)),
-so each file name becomes a command:
+### The model
+
+- **Proton Pass is the source of truth.** Nothing secret is written to git, to a
+  profile, or to a dotfile.
+- A feature that needs a secret declares a **reference** in its
+  `secrets.refs`:
+
+  ```sh
+  # NAME[:ttl]=pass://<vault name>/<item title>/<field>
+  GITHUB_TOKEN=pass://Personal/GitHub Token/password
+  ARTIFACTORY_TOKEN:12h=pass://Work/Artifactory/password
+  ```
+
+- `secret NAME` and `with-secrets` resolve a NAME from the **Keychain cache**
+  when it's fresh, and otherwise from **Proton Pass** (about 1s), re-caching the
+  value.
+- Secrets are **never exported into your shell**. `with-secrets -- cmd` puts
+  them into the environment of that one command only. `mvn` and the `mw*`
+  aliases already do this, so `${env.NAME}` in `~/.m2/settings.xml` just
+  works.
+
+### Which secret do I need?
+
+```sh
+secret list      # every declared NAME, its TTL, cache age, reference, and declaring file
+secret scan      # variables used by ~/.m2/settings.xml: declared / set in shell / MISSING
+secret scan ~/.npmrc some/config.yml   # any other file that uses ${X} or ${env.X}
+secret status    # log-in check + fetch every NAME now; tells you which references are broken
+```
+
+When a tool asks for a token, or `secret scan` reports **MISSING**, declare it:
+
+```sh
+secret add NAME   # link it to an EXISTING Proton Pass item
+secret new NAME   # create a NEW login item in Proton Pass, then link it
+#  --feature git | m2.symlink | profile:artifactory   where to declare it (asks if omitted)
+#  --ttl 12h | 7d | 0 | forever                        cache lifetime (default 7d)
+```
+
+`secret add` walks you through fzf pickers: feature → vault → item → field
+(only field *names* are shown). It writes the reference, then fetches the value
+once to verify it and warm the cache. Choose the feature by asking yourself
+*"if I delete this feature, should this secret go too?"* Anything
+company-specific goes in `profile:<feature>`.
+
+### Caching
+
+|              |                                                                                                                              |
+|--------------|------------------------------------------------------------------------------------------------------------------------------|
+| Where        | macOS login Keychain, generic passwords named `dotfiles:<NAME>` (open *Keychain Access* and search "dotfiles")               |
+| Default TTL  | `7d`. Override per secret (`NAME:12h=`) or globally (`export DOTFILES_SECRET_TTL=1d` in `~/.zshenv`)                         |
+| Never cache  | `NAME:0=...`. Use this for anything you'd hate to lose.                                                                      |
+| Invalidation | changing a reference invalidates its cache automatically; `secret refresh [NAME]` re-fetches; `secret forget [NAME]` deletes |
+| Not cached   | multi-line values (keys, certificates), and `secret pass://...` lookups                                                      |
+
+Cached values are protected by your login Keychain (encrypted at rest, locked
+with your Mac). They only reach the `security` tool through stdin, never as
+process arguments.
+
+### Commands
+
+```sh
+secret login                 # pass-cli login (browser)
+secret NAME                  # print a value, e.g. `secret GITHUB_TOKEN | pbcopy`
+secret pass://Vault/Item/field
+with-secrets -- mvn verify               # all declared secrets
+with-secrets GITHUB_TOKEN -- gh pr list  # only these
+secret refresh | forget [NAME ...]
+```
+
+A variable that's already set (e.g. by direnv) is not fetched again. If Proton
+Pass is unreachable and nothing is cached, `with-secrets` warns and runs the
+command anyway.
+
+### If a secret leaks
+
+1. Revoke or rotate it at the source (GitHub, Artifactory, ...).
+2. Update the item in Proton Pass, then run `secret refresh NAME`.
+3. If it was ever committed, scrub history with `git filter-repo` and force-push.
+
+## SSH keys
+
+SSH keys live in Proton Pass, and the **Proton Pass SSH agent** serves them,
+so no private key sits on disk.
+
+- [`ssh/agent.zsh`](ssh/agent.zsh) starts `pass-cli ssh-agent daemon` in the
+  background if it isn't running (requires `secret login`) and exports
+  `SSH_AUTH_SOCK=~/.ssh/proton-pass-agent.sock`.
+- [`ssh/install.sh`](ssh/install.sh) adds `Include ~/.dotfiles/ssh/config` at the
+  top of `~/.ssh/config`. That config sets `IdentityAgent` to the socket and
+  includes the active profile's `ssh/config`.
+- `ssh-keys` lists the keys the agent serves; `ssh-agent-status` and
+  `ssh-agent-restart` manage the daemon.
+- To use the system agent instead, put `export DOTFILES_SSH_AGENT=system` in `~/.zshenv`.
+
+## Git, Maven
+
+**Git.** [`git/gitconfig.symlink`](git/gitconfig.symlink) is the shared config
+(aliases, delta/difftastic, rebase defaults, ...). Includes, in order:
+`~/.gitconfig.local` (name, personal email, credential helper, signing key;
+created by bootstrap, git-ignored), then the active profile's `git/gitconfig`
+(work email, company hosts), which wins. Commits are not signed
+(`commit.gpgsign = false`). `gpg.format = ssh` is kept so `git commit -S` signs
+with a key from the agent. The global `commit-msg` hook appends a ticket key
+(`ABC-123`) taken from the branch name.
+
+**Maven.** `~/.m2` is `m2.symlink/`. The real `~/.m2/settings.xml` is
+git-ignored. Profiles provide it (e.g. linked by `artifactory/activate.sh`),
+and it must reference credentials as `${env.NAME}`, never inline.
+[`m2.symlink/maven.zsh`](m2.symlink/maven.zsh) wraps `mvn` and the
+`mw`/`mwv`/`mwi` aliases (`./mvnw`) with `with-secrets`. IDEs that run Maven
+themselves don't get these variables: set them in the IDE run configuration,
+or launch the IDE through `with-secrets`.
+
+## Aliases, functions, shell tools
+
+### Aliases
+
+Aliases live next to the feature they belong to:
+
+- [`zsh/aliases.zsh`](zsh/aliases.zsh): general shortcuts (`g`=git, `k`=kubectl,
+  directory jumps `..`/`...`, and modern-tool replacements like `eza`/`rg`/`lazygit`
+  that only activate when installed).
+- [`m2.symlink/maven.zsh`](m2.symlink/maven.zsh): `mw`, `mws`, `mwv`, `mwi`.
+- [`system/aliases.zsh`](system/aliases.zsh): `ls`/`l`/`ll`/`la`.
+- [`ssh/agent.zsh`](ssh/agent.zsh): `ssh-keys`, `ssh-agent-status`, `ssh-agent-restart`.
+- [`git/aliases.zsh`](git/aliases.zsh): fzf git helpers. `jira`/`gcoa` fuzzy-checkout
+  a branch, `gco` a local branch, `gbd` fuzzy-deletes branches, `glog` browses
+  history, `gstash` manages stashes, `gfixup` picks a commit to fixup and
+  autosquash. Most git shortcuts are git aliases in
+  [`git/gitconfig.symlink`](git/gitconfig.symlink). Run `git aliases` to list them.
+
+### Custom functions
+
+Files in [`functions/`](functions) are autoloaded, so each file name becomes a
+command. Profiles can add their own in `<feature>/functions/`.
 
 | Command             | What it does                                                             |
 |---------------------|--------------------------------------------------------------------------|
@@ -74,7 +268,6 @@ so each file name becomes a command:
 | `certinfo <cert>`   | Summarise an X.509 cert (subject/issuer/dates/SANs); `-t` for full text. |
 | `jarpeek <jar> …`   | List/grep jar entries, `-x` print an entry, `-c` `javap` a class.        |
 | `klog [-n ns] [-f]` | Fuzzy-pick a Kubernetes pod with `fzf` and tail its logs.                |
-| `volvo-jwt-token`   | Print the `sub` claim of a fresh Volvo ID token (`-e qa\|prod`).         |
 | `killport <port>`   | Kill whatever is listening on a TCP port (`-9` for SIGKILL).             |
 | `serve [port]`      | Serve the current directory over HTTP (default `8000`).                  |
 | `dsh [shell]`       | Fuzzy-pick a running Docker container and open a shell in it.            |
@@ -82,89 +275,49 @@ so each file name becomes a command:
 
 Run any of them with `-h`/`--help` for usage.
 
-## Shell plugins & tools
+### Shell plugins & tools
 
-Wired up (and sourced in the right order) by [`zsh/zshrc.symlink`](zsh/zshrc.symlink),
-all guarded so a fresh machine still boots if something is missing:
+Wired up (in the right order) by [`zsh/zshrc.symlink`](zsh/zshrc.symlink), all guarded:
 
-- **fzf** — `Ctrl-T` file picker, `Alt-C` cd, fuzzy completion (and it powers the
-  `git/*` helpers). `Ctrl-R` history is handled by **atuin** (below).
-- **atuin** — SQLite-backed shell history with context-aware search (filter by
-  directory, exit code, session; optional end-to-end-encrypted sync). It owns
-  `Ctrl-R` (loaded after fzf so it wins the binding) and is started with
-  `--disable-up-arrow`, so the arrow-key history search still works. Import
-  existing history any time with `atuin import auto`.
-- **fzf-tab** — replaces the tab-completion menu with an `fzf` picker. It is not
-  in Homebrew core, so [`fzf-tab/install.sh`](fzf-tab/install.sh) clones it into
-  `~/.zsh/fzf-tab` (run automatically by `script/install`).
-- **zoxide** — frecency-based `cd`; jump with `z <partial>`.
-- **direnv** — per-directory environment variables. Drop an `.envrc` in a project,
-  run `direnv allow`, and its env loads on `cd` in and unloads on the way out.
-  Hooked in [`direnv/init.zsh`](direnv/init.zsh).
-- **eza icons** — the `ls`/`l`/`ll`/`la`/`lt` aliases pass `--icons=auto`, so
-  file-type glyphs show up (thanks to the Nerd Font).
-- **bat man pages** — `MANPAGER` uses `bat` for syntax-highlighted `man` output
-  (see [`system/env.zsh`](system/env.zsh)).
-- **oh-my-posh** — the prompt theme engine. The theme is vendored in this repo at
-  [`oh-my-posh/theme.omp.json`](oh-my-posh/theme.omp.json) and applied
-  automatically on shell start by [`zsh/zshrc.symlink`](zsh/zshrc.symlink) — no
-  manual theme selection needed. The required Nerd Font (`font-fira-code-nerd-font`)
-  is installed by the [`Brewfile`](Brewfile), and [`iterm/install.sh`](iterm/install.sh)
-  installs a matching iTerm2 profile — **"Dotfiles (FiraCode Nerd Font)"** — with the
-  Nerd Font, Night Owl colours (matching the prompt), Option-as-Meta (for the
-  `Alt+f`/`Alt+b` word-nav bindings), UTF-8 and sane bell/scrollback defaults. It is
-  set as the **default** iTerm2 profile automatically, so the prompt glyphs render
-  correctly out of the box. If iTerm2 is already running, fully quit (`Cmd-Q`) and
-  reopen for it to take effect. Opt out with `DOTFILES_ITERM_DEFAULT=0`; your prior
-  default is saved to `~/.local/state/dotfiles/iterm-previous-default-guid` and can be
-  restored with `defaults write com.googlecode.iterm2 'Default Bookmark Guid' -string "<guid>"`.
-  Other terminals: set your font to *FiraCode Nerd Font* manually.
-- **zsh-autosuggestions** — fish-style inline suggestions from history (accept with →).
-- **zsh-syntax-highlighting** — colours commands as you type (sourced last).
+- **fzf**: `Ctrl-T` file picker, `Alt-C` cd, fuzzy completion; powers the git
+  helpers and the `secret add` pickers.
+- **atuin**: SQLite-backed history search. Owns `Ctrl-R` (loaded after fzf) and
+  is started with `--disable-up-arrow`. Import old history with `atuin import auto`.
+- **fzf-tab**: fzf-powered tab completion, cloned to `~/.zsh/fzf-tab` by
+  [`fzf-tab/install.sh`](fzf-tab/install.sh).
+- **zoxide**: `z <partial>` jumps to frecent directories.
+- **direnv**: per-directory env via `.envrc` (`direnv allow`). A handy place
+  for per-project, non-secret variables.
+- **oh-my-posh**: prompt theme vendored at [`oh-my-posh/theme.omp.json`](oh-my-posh/theme.omp.json).
+  It needs the Nerd Font from the Brewfile. [`iterm/install.sh`](iterm/install.sh)
+  installs and defaults a matching iTerm2 profile, "Dotfiles (FiraCode Nerd
+  Font)" (opt out with `DOTFILES_ITERM_DEFAULT=0`).
+- **eza** icons, **bat** man pages, **zsh-autosuggestions**, **zsh-syntax-highlighting** (sourced last).
 
-## Secrets
+## Changing jobs checklist
 
-**No secrets are stored anywhere by these dotfiles**: not in git, not in a
-profile, not in the Keychain. They stay in **Proton Pass** and are fetched with
-the Proton Pass CLI (`pass-cli`) only when a command needs them.
+Leaving:
 
-A feature that needs a secret declares a *reference* in a `secrets.refs` file
-next to it (global, or inside a profile feature):
+1. `profile off`
+2. Make sure the profile repo is pushed to its private remote, then `rm -rf profiles/<old>`.
+3. `secret forget` clears cached values; the Proton Pass vault itself is yours to clean up.
 
-```sh
-# git/secrets.refs
-GITHUB_TOKEN=pass://Personal/GitHub Token/password   # pass://<vault>/<item title>/<field>
-```
+Joining:
 
-```sh
-secret login                 # log in to Proton Pass once (pass-cli login)
-secret status                # check login + that every reference resolves (values never shown)
-secret list                  # NAME -> reference, and which file declared it
-secret GITHUB_TOKEN          # print one secret (e.g. | pbcopy)
-with-secrets -- mvn verify   # run ONE command with all referenced secrets in its env
-with-secrets GITHUB_TOKEN -- gh pr list   # ...or only the ones you name
-```
+1. `profile new <company>`, then `git -C profiles/<company> remote add origin <private-url>`.
+2. Fill in `git/gitconfig` (work email). Add a feature folder per need
+   (registry, VPN, cloud CLI, ...). Use `secret add NAME --feature profile:<feature>`
+   for its tokens.
+3. `profile use <company>`, `exec zsh`, and `dot` if you added a Brewfile or installer.
 
-`mvn` and the `mw*` aliases already go through `with-secrets` (see
-[`m2.symlink/maven.zsh`](m2.symlink/maven.zsh)), so `${env.NAME}` references in
-`~/.m2/settings.xml` just work. A variable already set in your environment
-(e.g. via direnv) is not fetched again.
+## Troubleshooting
 
-Machine-local, non-secret overrides go in `system/env.local.zsh` (git-ignored,
-copy it from `system/env.local.zsh.example`).
-
-### SSH keys
-
-SSH keys live in Proton Pass, and the **Proton Pass SSH agent** serves them.
-[`ssh/agent.zsh`](ssh/agent.zsh) starts the daemon in the background when it
-isn't running and exports `SSH_AUTH_SOCK`. [`ssh/install.sh`](ssh/install.sh)
-adds `Include ~/.dotfiles/ssh/config` to the top of `~/.ssh/config`, which
-points `IdentityAgent` at the agent and includes the active profile's
-`ssh/config`. Use `ssh-keys` to list the served keys and `ssh-agent-status` to
-check the daemon.
-
-### If a secret ever leaks
-
-1. Rotate/revoke it immediately at the source (GitHub, Artifactory, etc.).
-2. If it was ever committed, scrub history with `git filter-repo` and force-push.
-3. Update the item in Proton Pass. Nothing else needs to change.
+| Symptom                                  | Fix                                                                                                       |
+|------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `secret …` prints nothing at all | That terminal predates the change and still has an old `secret` zsh function (check: `whence -va secret`). Fix: `exec zsh` |
+| `with-secrets: could not get X`          | `secret status` shows whether you're logged in and which reference is broken. Re-link with `secret add X` |
+| Maven 401                                | `secret scan` (MISSING variables?), `secret refresh ARTIFACTORY_TOKEN` (rotated token?)                   |
+| `ssh: no identities` / permission denied | `secret login`, then `ssh-agent-restart` and `ssh-keys`                                                   |
+| Profile changes not visible              | `exec zsh`; for `~/.m2/settings.xml` run `profile off && profile use <name>`                              |
+| Wrong git email                          | `git config --show-origin user.email` shows which file set it                                             |
+| Slow shell start                         | `zsh -i -c exit` with `zmodload zsh/zprof` at the top of `~/.zshrc`                                       |
