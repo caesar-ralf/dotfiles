@@ -380,6 +380,26 @@ Wired up (in the right order) by [`core/zsh/zshrc.symlink`](core/zsh/zshrc.symli
   Font)" (opt out with `DOTFILES_ITERM_DEFAULT=0`).
 - **eza** icons, **bat** man pages, **zsh-autosuggestions**, **zsh-syntax-highlighting** (sourced last).
 
+## Tutorial: writing interactive commands
+
+[`tutorial/`](tutorial/README.md) explains how to write commands like `klog`,
+`dsh` or `gco`: bash commands that let you pick things with fzf and still
+work in scripts and pipes.
+
+1. [Anatomy of a good command](tutorial/01-anatomy.md): help text, options,
+   exit codes, stdout vs stderr, dry run, macOS/Linux portability.
+2. [Selection with fzf](tutorial/02-selection-with-fzf.md): pickers, hidden ID
+   columns, previews, multi-select, per-key actions, `--filter`.
+3. [Without fzf, without a human](tutorial/03-fallbacks-and-scripting.md):
+   arguments instead of pickers, terminal detection, `select` menus,
+   confirmations.
+4. [Shipping it in these dotfiles](tutorial/04-shipping-it.md): script or
+   function, which folder, zsh completion, testing, checklist.
+
+The runnable examples are in [`tutorial/examples/`](tutorial/examples), and
+`tutorial/examples/test.sh` checks them. The folder is documentation only:
+nothing in it is sourced, autoloaded or installed.
+
 ## Changing jobs checklist
 
 Leaving:

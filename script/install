@@ -35,7 +35,8 @@ fi
 
 # Find every topic installer and run it. Prune the huge Maven cache so we don't
 # walk 16k+ directories under packages/maven/m2.symlink/repository looking for install.sh, and
-# prune profiles/ (only the ACTIVE profile is installed, below).
+# prune profiles/ (only the ACTIVE profile is installed, below) and tutorial/
+# (documentation, never installed).
 header "Running topic installers"
 while IFS= read -r installer; do
     info "→ ${installer#"${DOTFILES}"/}"
@@ -43,6 +44,7 @@ while IFS= read -r installer; do
 done < <(find "${DOTFILES}" \
             -path "${DOTFILES}/packages/maven/m2.symlink/repository" -prune -o \
             -path "${DOTFILES}/profiles" -prune -o \
+            -path "${DOTFILES}/tutorial" -prune -o \
             -type f -name install.sh -print)
 
 # Active company profile: its Brewfiles and installers.

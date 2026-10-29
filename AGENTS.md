@@ -35,6 +35,10 @@ Before finishing any change, run the [leak check](#checks).
   features). Never nest deeper: the loader, `secrets_ref_files` and bootstrap's
   `find -maxdepth 3` only look at these two levels. Profiles stay flat
   (`profiles/<p>/<feature>/`).
+- **`tutorial/` is documentation, not a feature.** `dotfiles_features` and
+  `script/install` skip it. Never put `*.zsh`, `functions/`, `bin/`,
+  `install.sh` or `*.symlink` in it: the loader, bootstrap and installer would
+  pick them up. Examples are `examples/*.sh` scripts.
 - **File conventions** (auto-discovered, no registration needed):
 
   | File                                              | Picked up by                               | When                     |
@@ -189,6 +193,9 @@ command -v shellcheck >/dev/null && shellcheck -S warning -x script/* security/s
 
 # global git hooks + Jira ticket detection (real commits in a temp repo)
 script/test/git-hooks.sh
+
+# tutorial examples (non-interactive; only needed when tutorial/ changed)
+tutorial/examples/test.sh
 
 # shell still starts, profile still loads
 zsh -i -c 'echo ok; profile'

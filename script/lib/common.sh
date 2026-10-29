@@ -34,11 +34,12 @@ export DOTFILES_PROFILE_LINK="${DOTFILES_PROFILE_LINK:-$HOME/.config/dotfiles/pr
 DOTFILES_CATEGORIES="core shell security packages"
 
 # Print every feature as a repo-relative path (git, core/zsh, packages/maven, ...).
+# profiles/, script/ and tutorial/ (documentation only) are not features.
 dotfiles_features() {
     local d c name
     for d in "$DOTFILES"/*/; do
         name="$(basename "$d")"
-        case "$name" in profiles|script) continue ;; esac
+        case "$name" in profiles|script|tutorial) continue ;; esac
         case " $DOTFILES_CATEGORIES " in
             *" $name "*) for c in "$d"*/; do [ -d "$c" ] && printf '%s/%s\n' "$name" "$(basename "$c")"; done ;;
             *) printf '%s\n' "$name" ;;
