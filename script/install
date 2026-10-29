@@ -25,6 +25,7 @@ fi
 
 # Run Homebrew through the Brewfile.
 header "brew bundle"
+load_brew || true
 if command_exists brew; then
     brew bundle --file="${DOTFILES}/Brewfile"
     success "Brewfile applied."

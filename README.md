@@ -1,14 +1,16 @@
 # DOTFILES
 
-My macOS shell setup: zsh, git, CLI tools, apps. Company-specific config lives
-in switchable **profiles**, and secrets are fetched from **Proton Pass**.
+My shell setup for **macOS** (primary) and **Ubuntu/Debian Linux**: zsh, git,
+CLI tools, apps. Company-specific config lives in switchable **profiles**, and
+secrets are fetched from **Proton Pass**.
 
 ```sh
 git clone git@github.com:caesar-ralf/dotfiles.git ~/.dotfiles
-~/.dotfiles/script/bootstrap        # guided setup, safe to re-run
+~/.dotfiles/script/bootstrap        # guided setup, safe to re-run (macOS and Linux)
 ```
 
 - [Principles](#principles)
+- [Platforms: macOS and Linux](#platforms-macos-and-linux)
 - [Layout](#layout)
 - [Everyday commands](#everyday-commands)
 - [Company profiles](#company-profiles)
@@ -30,9 +32,32 @@ For AI agents and future contributors: read [`AGENTS.md`](AGENTS.md).
    registries and company-only commands live in a profile (a separate private
    repo under `profiles/`).
 3. **No secrets in any repo.** Features only declare *references* to Proton
-   Pass items. Values are fetched on demand and cached in the macOS Keychain.
+   Pass items. Values are fetched on demand and cached in the OS keychain.
 4. **Fresh machines still boot.** Every tool integration is guarded, so a
    missing tool is skipped, not an error.
+5. **One codebase for macOS and Linux.** Platform differences are handled in
+   one place (`platform/`) or behind guards, never in separate copies.
+
+## Platforms: macOS and Linux
+
+macOS is the primary platform. Ubuntu/Debian is supported, and
+`script/test-linux` verifies that in a Docker container.
+
+| Concern | macOS | Linux (Ubuntu/Debian) |
+|---------|-------|-----------------------|
+| Packages | Homebrew + `Brewfile` | Homebrew on Linux (`/home/linuxbrew`) + the same `Brewfile`; [`platform/install.sh`](platform/install.sh) apt-installs prerequisites (zsh, build tools, xclip/wl-clipboard, xdg-utils, libsecret-tools) |
+| GUI apps, fonts | casks in `Brewfile` | skipped (`if OS.mac?`); use apt/snap/flatpak and install a Nerd Font manually |
+| Secret cache | login Keychain (`security`) | desktop keyring via `secret-tool` (GNOME Keyring/KWallet); **no cache** without a D-Bus session (headless/SSH), so every lookup goes to Proton Pass |
+| `pbcopy` / `pbpaste` / `open` | native | shims in [`platform/linux-bin/`](platform/linux-bin) (wl-copy, xclip/xsel, WSL, xdg-open) |
+| `ls` colours | `gls` (coreutils) | GNU `ls` |
+| `intellij` | `open -a "IntelliJ IDEA"` | `idea` / `intellij-idea-ultimate` if installed |
+| gcloud | Homebrew cask | apt/snap/`~/google-cloud-sdk` |
+| iTerm2 profile | installed | skipped |
+| Login shell | zsh by default | bootstrap offers `chsh -s zsh` |
+
+`$DOTFILES_OS` (`macos` / `linux`) is available to every zsh file. To check
+Linux support after a change, run `script/test-linux`. It needs Docker and
+uses a fake `pass-cli`, so no real secrets are involved.
 
 ## Layout
 
@@ -47,7 +72,7 @@ For AI agents and future contributors: read [`AGENTS.md`](AGENTS.md).
 │   └── *.symlink              linked into $HOME as .<name> by bootstrap
 ├── functions/                 one file per command, autoloaded (extract, mkcd, klog, ...)
 ├── profiles/                  company profiles; only README.md and _template/ are committed
-├── script/                    bootstrap, dot, install, profile (+ lib/common.sh)
+├── script/                    bootstrap, dot, install, profile, test-linux (+ lib/common.sh, test/)
 ├── Brewfile                   global CLI tools and apps, grouped and commented
 └── AGENTS.md                  context for AI agents working on this repo
 ```
@@ -57,7 +82,8 @@ For AI agents and future contributors: read [`AGENTS.md`](AGENTS.md).
 | `zsh/`                                                                                       | `zshrc.symlink` (the loader), options, key bindings, general aliases                    |
 | `system/`                                                                                    | env vars (`env.zsh`), `ls` aliases, grc; `env.local.zsh` for git-ignored machine tweaks |
 | `git/`                                                                                       | `gitconfig.symlink`, global hooks, fzf git helpers, `GITHUB_TOKEN` reference            |
-| `secrets/`                                                                                   | `secret` and `with-secrets` (Proton Pass + Keychain cache)                              |
+| `secrets/`                                                                                   | `secret` and `with-secrets` (Proton Pass + OS keychain cache)                           |
+| `platform/`                                                                                  | OS detection (`$DOTFILES_OS`), Linux shims for `pbcopy`/`pbpaste`/`open`, apt prerequisites |
 | `ssh/`                                                                                       | Proton Pass SSH agent, `ssh/config` included from `~/.ssh/config`                       |
 | `m2.symlink/`                                                                                | `~/.m2`: Maven wrappers that inject secrets, `settings.xml.example`                     |
 | `functions/`                                                                                 | small standalone commands (see [below](#custom-functions))                              |
@@ -83,6 +109,7 @@ over 16k directories.
 | Command                                          | What it does                                                                           |
 |--------------------------------------------------|----------------------------------------------------------------------------------------|
 | `dot`                                            | Update Homebrew, `brew bundle`, and run every `install.sh` (global and active profile) |
+| `script/test-linux`                              | Check Linux (Ubuntu) support in Docker (fake `pass-cli`, no real secrets)               |
 | `dot --secrets`                                  | Same as `secret status`                                                                |
 | `profile` / `profile use <name>` / `profile off` | Show / switch / disable the company profile                                            |
 | `secret list`                                    | Which secrets exist, where they're declared, how fresh the cache is                    |
@@ -137,7 +164,7 @@ Details and the hook environment are in [`profiles/README.md`](profiles/README.m
   ARTIFACTORY_TOKEN:12h=pass://Work/Artifactory/password
   ```
 
-- `secret NAME` and `with-secrets` resolve a NAME from the **Keychain cache**
+- `secret NAME` and `with-secrets` resolve a NAME from the **OS keychain cache**
   when it's fresh, and otherwise from **Proton Pass** (about 1s), re-caching the
   value.
 - Secrets are **never exported into your shell**. `with-secrets -- cmd` puts
@@ -173,15 +200,16 @@ company-specific goes in `profile:<feature>`.
 
 |              |                                                                                                                              |
 |--------------|------------------------------------------------------------------------------------------------------------------------------|
-| Where        | macOS login Keychain, generic passwords named `dotfiles:<NAME>` (open *Keychain Access* and search "dotfiles")               |
+| Where        | macOS: login Keychain, items `dotfiles:<NAME>` (search "dotfiles" in *Keychain Access*). Linux: desktop keyring via `secret-tool`, `service=dotfiles name=<NAME>` (*Seahorse* / "Passwords and Keys"). Neither available: no cache. Force one with `DOTFILES_SECRET_CACHE=keychain\|libsecret\|none`. `secret status` shows which is in use |
 | Default TTL  | `7d`. Override per secret (`NAME:12h=`) or globally (`export DOTFILES_SECRET_TTL=1d` in `~/.zshenv`)                         |
 | Never cache  | `NAME:0=...`. Use this for anything you'd hate to lose.                                                                      |
 | Invalidation | changing a reference invalidates its cache automatically; `secret refresh [NAME]` re-fetches; `secret forget [NAME]` deletes |
 | Not cached   | multi-line values (keys, certificates), and `secret pass://...` lookups                                                      |
 
-Cached values are protected by your login Keychain (encrypted at rest, locked
-with your Mac). They only reach the `security` tool through stdin, never as
-process arguments.
+Cached values are protected by the OS keychain (encrypted at rest, locked with
+your login). They reach `security` / `secret-tool` only through stdin, never as
+process arguments. On Linux, keyring calls time out after 5s
+(`DOTFILES_SECRET_TOOL_TIMEOUT`), so a locked keyring over SSH can't hang a command.
 
 ### Commands
 

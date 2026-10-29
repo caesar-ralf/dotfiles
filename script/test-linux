@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# test-linux: check that these dotfiles work on Ubuntu, in a throwaway Docker
+# container. Uses a FAKE pass-cli (dummy values), so no real secrets are
+# involved, and copies the repo WITHOUT private profiles, .git or the Maven cache.
+#
+#     script/test-linux                 # ubuntu:24.04
+#     script/test-linux ubuntu:22.04
+#
+# Covers: zsh startup without Homebrew, platform shims, profile use/off (with a
+# scratch profile made from _template), secrets with no cache and with the
+# libsecret keyring cache, with-secrets, and bash syntax under GNU tools.
+
+__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${__dir}/lib/common.sh"
+
+image="${1:-ubuntu:24.04}"
+command_exists docker || fail "docker is required."
+
+# Copy the repo minus private/heavy bits into a temp dir to mount read-only.
+src="$(mktemp -d)"
+trap 'rm -rf "$src"' EXIT
+tar -C "$DOTFILES" \
+    --exclude=./.git --exclude=./.idea --exclude=./m2.symlink/repository \
+    --exclude='./m2.symlink/settings.xml*' --exclude=./profiles \
+    -cf - . 2>/dev/null | tar -C "$src" -xf -
+mkdir -p "$src/profiles"
+cp -R "$DOTFILES/profiles/README.md" "$DOTFILES/profiles/_template" "$src/profiles/"
+cp "$DOTFILES/m2.symlink/settings.xml.example" "$src/m2.symlink/" 2>/dev/null
+
+header "Running Linux checks in $image"
+docker run --rm -v "$src:/src:ro" "$image" bash /src/script/test/linux-container.sh

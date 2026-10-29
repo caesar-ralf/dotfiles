@@ -5,8 +5,10 @@ Context for AI agents (and humans) changing this repo. Read this first; the
 
 ## What this is
 
-Personal macOS dotfiles (zsh, git, Homebrew, CLI tools) for one user, kept in
-`~/.dotfiles`. **The repo is public.** Two hard rules follow from that:
+Personal dotfiles (zsh, git, Homebrew, CLI tools) for one user, kept in
+`~/.dotfiles`. **macOS is the primary platform; Ubuntu/Debian Linux must keep
+working too** (verified by `script/test-linux`). **The repo is public.** Two
+hard rules follow from that:
 
 1. **Never commit secrets.** No tokens, passwords, private keys, or JWTs.
    Not in examples, not in comments, not in tests.
@@ -67,13 +69,27 @@ Before finishing any change, run the [leak check](#checks).
 - **SSH**: the Proton Pass SSH agent (`ssh/agent.zsh`) at
   `~/.ssh/proton-pass-agent.sock`. `ssh/install.sh` adds one `Include` line
   to `~/.ssh/config`; the rest of that file belongs to the user.
+- **Platforms** (`platform/`):
+  - `platform/_path.zsh` sets `DOTFILES_OS=macos|linux` and, on Linux, puts
+    `platform/linux-bin/` (`pbcopy`, `pbpaste`, `open` shims) on PATH. Code
+    can therefore use the macOS command names everywhere.
+  - `platform/install.sh` apt-installs Linux prerequisites.
+  - Homebrew is the package manager on both systems (Linuxbrew on Linux).
+    `load_brew` in `script/lib/common.sh` and the top of `zsh/zshrc.symlink`
+    find it in `/opt/homebrew`, `/usr/local`, or `/home/linuxbrew`.
+    `$BREW_PREFIX` is **empty** when Homebrew is absent, so guard every use.
+  - Casks are macOS-only (`if OS.mac?` in the Brewfile).
+  - Secret cache backends: `keychain` (macOS `security`), `libsecret`
+    (Linux `secret-tool`, needs a D-Bus session), or `none`. Selection is in
+    `secrets_cache_backend`.
 - **Git**: `git/gitconfig.symlink` includes `~/.gitconfig.local` first
   (machine/personal, git-ignored) and the profile's `git/gitconfig` last.
 
 ## Repo map
 
 ```
-script/      bootstrap (fresh machine), dot (update), install (brew + installers), profile; lib/common.sh = output helpers, confirm, active_profile
+script/      bootstrap (fresh machine), dot (update), install (brew + installers), profile, test-linux; lib/common.sh = output helpers, confirm, active_profile, is_macos/is_linux, load_brew; test/linux-container.sh
+platform/    _path.zsh (DOTFILES_OS, Linux shims on PATH), linux-bin/{pbcopy,pbpaste,open}, install.sh (apt prerequisites)
 secrets/     lib.sh, bin/secret, bin/with-secrets, install.sh (checks pass-cli)
 ssh/         agent.zsh, config, install.sh
 git/         gitconfig.symlink, gitconfig.local.symlink(.example), git_global.symlink/hooks/commit-msg, aliases.zsh, secrets.refs
@@ -87,10 +103,21 @@ Brewfile     global packages, grouped with one-line comments
 
 ## Coding conventions
 
-- **Bash scripts** (`script/*`, `secrets/*`, hooks): `#!/usr/bin/env bash`,
-  **compatible with macOS bash 3.2**. No `mapfile`, no associative arrays, no
-  `${var,,}`. Use `set -o errexit -o pipefail` where failure should stop the
-  script. Source `script/lib/common.sh` for `header/info/success/warn/note/fail/confirm`.
+- **Bash scripts** (`script/*`, `secrets/*`, hooks): `#!/usr/bin/env bash`.
+  They must run on **macOS bash 3.2 with BSD tools AND Linux bash 5 with GNU
+  tools**:
+  - No `mapfile`, no associative arrays, no `${var,,}`.
+  - `sed -i.bak … && rm *.bak` (never `sed -i ''` or bare `sed -i`).
+  - No `readlink -f`, `stat -f/-c`, `date -v/-d`, `grep -P`, or bsdtar-only
+    globs.
+  - `shasum` may be missing on Linux (fall back to `sha1sum`).
+  - Use `set -o errexit -o pipefail` where failure should stop the script.
+  - Source `script/lib/common.sh` for `header/info/success/warn/note/fail/confirm`,
+    `is_macos/is_linux`, and `load_brew`.
+- **OS-specific code**: prefer one portable implementation. Otherwise branch
+  on `$DOTFILES_OS` (zsh) or `is_macos`/`is_linux` (bash) inside the feature.
+  Put a macOS command's Linux equivalent in `platform/linux-bin/` instead of
+  sprinkling `if`s.
 - **zsh files** run in the user's interactive shell on every start. Keep them
   fast (no network calls, no `brew --prefix` in loops) and guarded (`command -v
   tool >/dev/null 2>&1 && ...`). Use `(N)` glob qualifiers for globs that may
@@ -135,6 +162,9 @@ command -v shellcheck >/dev/null && shellcheck -S warning -x script/* secrets/li
 # shell still starts, profile still loads
 zsh -i -c 'echo ok; profile'
 
+# Linux (Ubuntu 24.04 in Docker, fake pass-cli; ~1 min). Must print ALL LINUX CHECKS PASSED.
+script/test-linux
+
 # leak check over everything that would be committed (expect no output).
 # Extend the pattern with the current employer's name, domain and username.
 git ls-files -co --exclude-standard | grep -v '^m2.symlink/repository' \
@@ -148,7 +178,16 @@ git add -A --dry-run | grep 'profiles/' | grep -vE "profiles/(README.md|_templat
   scripts and tool commands use `command grep` / `command cat`.
 - `pass-cli` v2 has no `test` subcommand. Use `pass-cli info` to check the
   session. `item list` on a big vault takes several seconds; `item view` about 1s.
-- The Keychain cache only lives on macOS (`security`). On other systems
-  `secrets_cache_*` are no-ops and every lookup goes to Proton Pass.
+- The secret cache lives in the OS secret store: `security` (macOS) or
+  `secret-tool` (Linux, needs D-Bus). Without either, `secrets_cache_*` are
+  no-ops and every lookup goes to Proton Pass.
+- `secret-tool search` prints the secret on stdout but the `attribute.*`
+  lines on **stderr**. Capture with `2>&1`, or cache reads silently miss.
+- GNOME Keyring in a container sometimes can't create its default keyring
+  (it wants a GUI prompter). `script/test/linux-container.sh` retries and
+  SKIPs in that case; a FAIL there is a real bug.
+- `git/completion.zsh` was removed on purpose. Homebrew's `_git` is an
+  `fpath` completion function, and sourcing it at startup prints `_tags`
+  errors.
 - `git/gitconfig.local.symlink` and `system/env.local.zsh` are machine-local
   and git-ignored. Don't create them in commits; bootstrap generates them.

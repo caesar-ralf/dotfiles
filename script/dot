@@ -63,9 +63,16 @@ fi
 # Nested `install` should not print its own wizard on top of ours.
 export DOTFILES_WIZARD_GREETED=1
 
+# Linux: apt prerequisites (zsh, Linuxbrew build deps, clipboard, secret-tool).
+if is_linux; then
+    header "Linux prerequisites"
+    "${DOTFILES}/platform/install.sh" 2>&1
+fi
+
 # Install Homebrew (no-op if already present).
 header "Homebrew"
 "${DOTFILES}/homebrew/install.sh" 2>&1
+load_brew || true
 
 # Upgrade Homebrew formulae metadata.
 if [ "$DO_UPDATE" = true ]; then

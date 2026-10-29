@@ -177,6 +177,7 @@ main() {
     setup_gitconfig
     install_dotfiles
     install_dependencies
+    setup_shell
     setup_secrets
     setup_profile
 

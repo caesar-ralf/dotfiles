@@ -1,24 +1,16 @@
 #!/bin/sh
 #
-# Homebrew
-#
-# This installs some of the common dependencies needed (or at least desired)
-# using Homebrew.
+# Homebrew (macOS) / Homebrew on Linux ("Linuxbrew"). Same installer for both.
+# On Linux, platform/install.sh provides its apt prerequisites
+# (build-essential, procps, curl, file, git).
 
-# Check for Homebrew
-if test ! $(which brew)
+if ! command -v brew >/dev/null 2>&1 \
+   && [ ! -x /opt/homebrew/bin/brew ] && [ ! -x /usr/local/bin/brew ] \
+   && [ ! -x /home/linuxbrew/.linuxbrew/bin/brew ]
 then
   echo "  Installing Homebrew for you."
-
-  # Install the correct homebrew for each OS type
-  if test "$(uname)" = "Darwin"
-  then
+  NONINTERACTIVE="${DOTFILES_YES:+1}" \
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  elif test "$(expr substr $(uname -s) 1 5)" = "Linux"
-  then
-    ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Linuxbrew/install/master/install)"
-  fi
-
 fi
 
 exit 0

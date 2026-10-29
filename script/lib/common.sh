@@ -75,6 +75,21 @@ command_exists() { command -v "$1" >/dev/null 2>&1; }
 is_macos()       { [ "$(uname -s)" = "Darwin" ]; }
 is_linux()       { [ "$(uname -s)" = "Linux" ]; }
 
+# Put Homebrew on PATH for this script if it is installed but not yet on PATH
+# (typical right after installing it, and on Linux where it lives in
+# /home/linuxbrew). Returns non-zero when Homebrew is not installed.
+load_brew() {
+    command -v brew >/dev/null 2>&1 && return 0
+    local b
+    for b in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew "$HOME/.linuxbrew/bin/brew"; do
+        if [ -x "$b" ]; then
+            eval "$("$b" shellenv)"
+            return 0
+        fi
+    done
+    return 1
+}
+
 # confirm "Question?"  -> returns 0 for yes, 1 for no. Defaults to No.
 # Honours DOTFILES_YES=1 (assume yes) for non-interactive runs.
 confirm() {

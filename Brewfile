@@ -1,4 +1,4 @@
-cask_args appdir: '/Applications'
+cask_args appdir: '/Applications' if OS.mac?
 
 # =============================================================================
 # Taps

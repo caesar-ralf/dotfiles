@@ -1,0 +1,10 @@
+#!/bin/sh
+# pbpaste for Linux: print the clipboard (Wayland, X11, or WSL).
+if [ -n "${WAYLAND_DISPLAY:-}" ] && command -v wl-paste >/dev/null 2>&1; then exec wl-paste --no-newline
+elif [ -n "${DISPLAY:-}" ] && command -v xclip >/dev/null 2>&1; then exec xclip -selection clipboard -out
+elif [ -n "${DISPLAY:-}" ] && command -v xsel  >/dev/null 2>&1; then exec xsel --clipboard --output
+elif command -v powershell.exe >/dev/null 2>&1; then exec powershell.exe -NoProfile -Command Get-Clipboard
+else
+  echo "pbpaste: no clipboard available (needs a Wayland/X11 session with wl-clipboard or xclip, or WSL)" >&2
+  exit 1
+fi

@@ -5,8 +5,16 @@ export DEFAULT_USER=`whoami`
 # Keep PATH/fpath entries unique so they don't grow on every nested shell.
 typeset -U path PATH fpath
 
-# Homebrew prefix, resolved once (avoids spawning `brew --prefix` repeatedly).
-export BREW_PREFIX="${HOMEBREW_PREFIX:-$(brew --prefix)}"
+# Homebrew (macOS or Linuxbrew). Put it on PATH if it isn't yet (fresh Linux
+# shells don't have it), then resolve the prefix once (avoids spawning
+# `brew --prefix` repeatedly). Empty when Homebrew is not installed.
+if ! command -v brew >/dev/null 2>&1; then
+  for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew "$HOME/.linuxbrew/bin/brew"; do
+    [ -x "$_brew" ] && { eval "$("$_brew" shellenv)"; break; }
+  done
+  unset _brew
+fi
+export BREW_PREFIX="${HOMEBREW_PREFIX:-$(command -v brew >/dev/null 2>&1 && brew --prefix)}"
 
 # your project folder that we can `c [tab]` to
 export PROJECTS="~/workspace"
@@ -115,9 +123,18 @@ if command -v oh-my-posh >/dev/null 2>&1; then
   eval "$(oh-my-posh init zsh --config "$DOTFILES/oh-my-posh/theme.omp.json")"
 fi
 
-# GOOGLE CLOUD SDK (its internal compinit is skipped; see note above)
-source "$BREW_PREFIX/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc"
-source "$BREW_PREFIX/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc"
+# GOOGLE CLOUD SDK (its internal compinit is skipped; see note above).
+# Homebrew cask on macOS; apt/snap/tarball locations on Linux.
+for _gcloud in "$BREW_PREFIX/Caskroom/google-cloud-sdk/latest/google-cloud-sdk" \
+               /usr/lib/google-cloud-sdk /usr/share/google-cloud-sdk /snap/google-cloud-cli/current \
+               "$HOME/google-cloud-sdk"; do
+  if [ -f "$_gcloud/path.zsh.inc" ]; then
+    source "$_gcloud/path.zsh.inc"
+    [ -f "$_gcloud/completion.zsh.inc" ] && source "$_gcloud/completion.zsh.inc"
+    break
+  fi
+done
+unset _gcloud
 
 # bookmarks
 if [ -d "$HOME/.bookmarks" ]; then

@@ -19,7 +19,8 @@
 # The item title may contain "/" (everything between the first and the last "/"
 # is the title). When the same NAME is declared twice, the active profile wins.
 #
-# CACHE: values fetched from Proton Pass are cached in the macOS login Keychain
+# CACHE: values fetched from Proton Pass are cached in the OS secret store (macOS
+# Keychain, or the Linux desktop keyring via secret-tool; see "Cache" below)
 # as generic passwords named "dotfiles:<NAME>". The item comment holds
 # "<fetched-epoch> <hash of the reference>", so changing a reference
 # invalidates its cache. Default TTL: $DOTFILES_SECRET_TTL (7d). Multi-line
@@ -145,63 +146,137 @@ secrets_resolve() {
     printf '%s\n' "$value"
 }
 
-# --- Keychain cache --------------------------------------------------------
+# --- Cache (OS secret store) -----------------------------------------------
+#
+# Backends, picked automatically (override: DOTFILES_SECRET_CACHE=keychain|libsecret|none):
+#   keychain   macOS login Keychain via `security`. Items: service "dotfiles:<NAME>",
+#              comment "<epoch> <hash(ref)>". Values go in through `security -i` (stdin).
+#   libsecret  Linux desktop keyring (GNOME Keyring/KWallet) via `secret-tool`
+#              (apt install libsecret-tools). Attributes: service=dotfiles name=<NAME>
+#              fetched=<epoch> refhash=<hash>. Values go in on stdin.
+#   none       no cache (headless Linux without a keyring); every lookup hits Proton Pass.
 
-secrets_have_keychain() {
-    command -v security >/dev/null 2>&1
+secrets_cache_backend() {
+    if [ -z "${SECRETS_BACKEND:-}" ]; then
+        case "${DOTFILES_SECRET_CACHE:-auto}" in
+            keychain|libsecret|none) SECRETS_BACKEND="$DOTFILES_SECRET_CACHE" ;;
+            *)
+                if command -v security >/dev/null 2>&1 && [ "$(uname -s)" = "Darwin" ]; then
+                    SECRETS_BACKEND=keychain
+                elif command -v secret-tool >/dev/null 2>&1 && [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+                    SECRETS_BACKEND=libsecret
+                else
+                    SECRETS_BACKEND=none
+                fi
+                ;;
+        esac
+    fi
+    printf '%s\n' "$SECRETS_BACKEND"
 }
 
 secrets_hash() {
-    printf '%s' "$1" | shasum | cut -c1-16
+    if command -v shasum >/dev/null 2>&1; then
+        printf '%s' "$1" | shasum | cut -c1-16
+    else
+        printf '%s' "$1" | sha1sum | cut -c1-16
+    fi
+}
+
+# secret-tool can block on a GUI unlock prompt (e.g. a locked keyring over SSH).
+# The cache is best effort, so never let it hang a command.
+_secret_tool() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "${DOTFILES_SECRET_TOOL_TIMEOUT:-5}" secret-tool "$@"
+    else
+        secret-tool "$@"
+    fi
+}
+
+# Read the cache entry for NAME into CACHE_STAMP, CACHE_HASH (and CACHE_VALUE
+# when the 2nd arg is "value"). Fails when there is no entry.
+secrets_cache_read() {
+    local name="$1" want="${2:-}" meta comment line
+    CACHE_STAMP="" CACHE_HASH="" CACHE_VALUE=""
+    case "$(secrets_cache_backend)" in
+        keychain)
+            meta="$(security find-generic-password -a "$USER" -s "${SECRETS_KC_PREFIX}${name}" 2>/dev/null)" || return 1
+            comment="$(printf '%s\n' "$meta" | sed -n 's/^ *"icmt"<blob>="\(.*\)"$/\1/p')"
+            CACHE_STAMP="${comment%% *}"
+            CACHE_HASH="${comment#* }"
+            if [ "$want" = "value" ]; then
+                CACHE_VALUE="$(security find-generic-password -a "$USER" -s "${SECRETS_KC_PREFIX}${name}" -w 2>/dev/null)" || return 1
+            fi
+            ;;
+        libsecret)
+            # `search` prints the secret on stdout and the attributes on STDERR,
+            # so capture both (in memory only).
+            meta="$(_secret_tool search service dotfiles name "$name" 2>&1)" || return 1
+            while IFS= read -r line; do
+                case "$line" in
+                    "attribute.fetched = "*) CACHE_STAMP="${line#attribute.fetched = }" ;;
+                    "attribute.refhash = "*) CACHE_HASH="${line#attribute.refhash = }" ;;
+                    "secret = "*)            [ "$want" = "value" ] && CACHE_VALUE="${line#secret = }" ;;
+                esac
+            done <<< "$meta"
+            ;;
+        *) return 1 ;;
+    esac
+    [[ "$CACHE_STAMP" =~ ^[0-9]+$ ]]
 }
 
 # Print the cached value of NAME if it is fresh for REF and TTL (seconds).
 secrets_cache_get() {
-    local name="$1" ref="$2" ttl="$3" meta comment stamp hash now
-    [ "$ttl" != 0 ] && secrets_have_keychain || return 1
-    meta="$(security find-generic-password -a "$USER" -s "${SECRETS_KC_PREFIX}${name}" 2>/dev/null)" || return 1
-    comment="$(printf '%s\n' "$meta" | sed -n 's/^ *"icmt"<blob>="\(.*\)"$/\1/p')"
-    stamp="${comment%% *}"
-    hash="${comment#* }"
-    [[ "$stamp" =~ ^[0-9]+$ ]] || return 1
-    [ "$hash" = "$(secrets_hash "$ref")" ] || return 1
-    if [ "$ttl" -gt 0 ]; then
-        now="$(date +%s)"
-        [ $(( now - stamp )) -lt "$ttl" ] || return 1
+    local name="$1" ref="$2" ttl="$3"
+    [ "$ttl" != 0 ] || return 1
+    secrets_cache_read "$name" value || return 1
+    [ "$CACHE_HASH" = "$(secrets_hash "$ref")" ] || return 1
+    if [ "$ttl" -gt 0 ] && [ $(( $(date +%s) - CACHE_STAMP )) -ge "$ttl" ]; then
+        return 1
     fi
-    security find-generic-password -a "$USER" -s "${SECRETS_KC_PREFIX}${name}" -w 2>/dev/null
+    [ -n "$CACHE_VALUE" ] && printf '%s\n' "$CACHE_VALUE"
 }
 
 # Cache VALUE for NAME (fetched now, for REF). Silently skips what it can't cache.
 secrets_cache_put() {
-    local name="$1" ref="$2" value="$3" esc
-    secrets_have_keychain || return 0
+    local name="$1" ref="$2" value="$3" esc now hash
     case "$value" in *$'\n'*) return 0 ;; esac
-    esc="$(printf '%s' "$value" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-    secrets_cache_forget "$name"
-    printf 'add-generic-password -a "%s" -s "%s" -l "%s" -j "%s %s" -w "%s"\n' \
-        "$USER" "${SECRETS_KC_PREFIX}${name}" "dotfiles secret ${name} (cache of Proton Pass)" \
-        "$(date +%s)" "$(secrets_hash "$ref")" "$esc" \
-        | security -i >/dev/null 2>&1 || true
+    now="$(date +%s)"
+    hash="$(secrets_hash "$ref")"
+    case "$(secrets_cache_backend)" in
+        keychain)
+            esc="$(printf '%s' "$value" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+            secrets_cache_forget "$name"
+            printf 'add-generic-password -a "%s" -s "%s" -l "%s" -j "%s %s" -w "%s"\n' \
+                "$USER" "${SECRETS_KC_PREFIX}${name}" "dotfiles secret ${name} (cache of Proton Pass)" \
+                "$now" "$hash" "$esc" \
+                | security -i >/dev/null 2>&1 || true
+            ;;
+        libsecret)
+            secrets_cache_forget "$name"
+            printf '%s' "$value" | _secret_tool store --label="dotfiles secret ${name} (cache of Proton Pass)" \
+                service dotfiles name "$name" fetched "$now" refhash "$hash" >/dev/null 2>&1 || true
+            ;;
+    esac
+    return 0
 }
 
 secrets_cache_forget() {
-    secrets_have_keychain || return 0
-    security delete-generic-password -a "$USER" -s "${SECRETS_KC_PREFIX}$1" >/dev/null 2>&1 || true
+    case "$(secrets_cache_backend)" in
+        keychain)  security delete-generic-password -a "$USER" -s "${SECRETS_KC_PREFIX}$1" >/dev/null 2>&1 ;;
+        libsecret) _secret_tool clear service dotfiles name "$1" >/dev/null 2>&1 ;;
+    esac
+    return 0
 }
 
 # Age of the cached value in seconds, or empty when nothing is cached.
 secrets_cache_age() {
-    local meta stamp
-    secrets_have_keychain || return 0
-    meta="$(security find-generic-password -a "$USER" -s "${SECRETS_KC_PREFIX}$1" 2>/dev/null)" || return 0
-    stamp="$(printf '%s\n' "$meta" | sed -n 's/^ *"icmt"<blob>="\([0-9]*\) .*"$/\1/p')"
-    [ -n "$stamp" ] && echo $(( $(date +%s) - stamp ))
+    secrets_cache_read "$1" || return 0
+    echo $(( $(date +%s) - CACHE_STAMP ))
 }
 
 # --- High level ------------------------------------------------------------
 
-# Print the value of NAME: Keychain cache when fresh, else Proton Pass (and
+# Print the value of NAME: OS cache when fresh, else Proton Pass (and
 # re-cache). Pass --refresh as 2nd arg to skip the cache.
 secrets_get() {
     local name="$1" refresh="${2:-}" entry ref ttl secs value

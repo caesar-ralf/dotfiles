@@ -8,7 +8,13 @@ alias docker-rmi-dangling='docker rmi $(docker images -q -f dangling=true)'
 alias docker-clean='docker rm -f $(docker ps -aq); docker-rmi-dangling'
 
 # code aliases
-alias intellij='open -a "IntelliJ IDEA"'
+if [ "$DOTFILES_OS" = macos ]; then
+  alias intellij='open -a "IntelliJ IDEA"'
+elif (( $+commands[idea] )); then
+  alias intellij='idea'                    # JetBrains Toolbox / snap launcher on Linux
+elif (( $+commands[intellij-idea-ultimate] )); then
+  alias intellij='intellij-idea-ultimate'
+fi
 alias gw=./gradlew
 
 # maven aliases live in m2.symlink/maven.zsh

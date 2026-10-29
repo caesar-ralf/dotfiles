@@ -1,0 +1,18 @@
+#!/bin/sh
+# open for Linux: open files/URLs with the desktop default app.
+# `open -a "App" [file]` is approximated by running the app's command if found.
+if [ "${1:-}" = "-a" ]; then
+  app="$(printf '%s' "$2" | tr '[:upper:] ' '[:lower:]-')"
+  shift 2
+  command -v "$app" >/dev/null 2>&1 || { echo "open: no command '$app' for -a" >&2; exit 1; }
+  nohup "$app" "$@" >/dev/null 2>&1 &
+  exit 0
+fi
+if command -v xdg-open >/dev/null 2>&1; then
+  for target in "$@"; do xdg-open "$target" >/dev/null 2>&1 & done
+elif command -v wslview >/dev/null 2>&1; then
+  exec wslview "$@"
+else
+  echo "open: xdg-open not found (apt install xdg-utils)" >&2
+  exit 1
+fi
