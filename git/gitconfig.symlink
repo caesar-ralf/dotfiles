@@ -112,7 +112,7 @@
     templatedir = ~/.git_global
     defaultBranch = main
 [commit]
-    gpgsign = true
+    gpgsign = false
     # show the staged diff in the commit message editor for a final review
     verbose = true
 [tag]
