@@ -36,7 +36,7 @@ For AI agents and future contributors: read [`AGENTS.md`](AGENTS.md).
 4. **Fresh machines still boot.** Every tool integration is guarded, so a
    missing tool is skipped, not an error.
 5. **One codebase for macOS and Linux.** Platform differences are handled in
-   one place (`platform/`) or behind guards, never in separate copies.
+   one place (`core/platform/`) or behind guards, never in separate copies.
 
 ## Platforms: macOS and Linux
 
@@ -45,10 +45,10 @@ macOS is the primary platform. Ubuntu/Debian is supported, and
 
 | Concern | macOS | Linux (Ubuntu/Debian) |
 |---------|-------|-----------------------|
-| Packages | Homebrew + `Brewfile` | Homebrew on Linux (`/home/linuxbrew`) + the same `Brewfile`; [`platform/install.sh`](platform/install.sh) apt-installs prerequisites (zsh, build tools, xclip/wl-clipboard, xdg-utils, libsecret-tools) |
+| Packages | Homebrew + `Brewfile` | Homebrew on Linux (`/home/linuxbrew`) + the same `Brewfile`; [`core/platform/install.sh`](core/platform/install.sh) apt-installs prerequisites (zsh, build tools, xclip/wl-clipboard, xdg-utils, libsecret-tools) |
 | GUI apps, fonts | casks in `Brewfile` | skipped (`if OS.mac?`); use apt/snap/flatpak and install a Nerd Font manually |
 | Secret cache | login Keychain (`security`) | desktop keyring via `secret-tool` (GNOME Keyring/KWallet); **no cache** without a D-Bus session (headless/SSH), so every lookup goes to Proton Pass |
-| `pbcopy` / `pbpaste` / `open` | native | shims in [`platform/linux-bin/`](platform/linux-bin) (wl-copy, xclip/xsel, WSL, xdg-open) |
+| `pbcopy` / `pbpaste` / `open` | native | shims in [`core/platform/linux-bin/`](core/platform/linux-bin) (wl-copy, xclip/xsel, WSL, xdg-open) |
 | `ls` colours | `gls` (coreutils) | GNU `ls` |
 | `intellij` | `open -a "IntelliJ IDEA"` | `idea` / `intellij-idea-ultimate` if installed |
 | gcloud | Homebrew cask | apt/snap/`~/google-cloud-sdk` |
@@ -61,48 +61,74 @@ uses a fake `pass-cli`, so no real secrets are involved.
 
 ## Layout
 
+Packaged **by feature**: a feature is one folder holding everything about one
+thing (its PATH, aliases, completion, installer, secrets, linked dotfiles).
+Features are grouped into a few **categories**. Deleting a feature folder
+removes the feature.
+
 ```
 ~/.dotfiles
-├── <feature>/                 one folder per feature (git, ssh, secrets, zsh, docker, ...)
-│   ├── _path.zsh              sourced first (PATH and similar)
-│   ├── *.zsh                  sourced on shell start
-│   ├── completion.zsh         sourced after compinit
-│   ├── install.sh             run by `dot` / script/install
-│   ├── secrets.refs           secrets this feature needs (references, never values)
-│   └── *.symlink              linked into $HOME as .<name> by bootstrap
-├── functions/                 one file per command, autoloaded (extract, mkcd, klog, ...)
+├── core/                      what everything else builds on
+│   ├── zsh/                   zshrc.symlink (the loader), options, key bindings, general aliases
+│   ├── system/                env vars (env.zsh), ls aliases, grc; env.local.zsh = git-ignored machine tweaks
+│   ├── platform/              OS detection ($DOTFILES_OS), Linux shims for pbcopy/pbpaste/open
+│   ├── homebrew/              installs Homebrew
+│   └── functions/             general commands, one file each, autoloaded (extract, mkcd, ...)
+├── shell/                     the interactive experience
+│   ├── prompt/                oh-my-posh theme
+│   ├── fzf-tab/  direnv/      fzf tab completion, per-directory env
+│   └── iterm/                 iTerm2 profile
+├── git/                       gitconfig, global hooks (Jira ticket), git ticket, fzf git helpers
+├── security/
+│   ├── secrets/               secret, with-secrets (Proton Pass + OS keychain cache)
+│   └── ssh/                   Proton Pass SSH agent, config included from ~/.ssh/config
+├── packages/                  one folder per tool or ecosystem
+│   ├── java/                  SDKMAN (JDKs), intellij/gw aliases, jarpeek
+│   ├── maven/                 mvn/mw* wrappers; m2.symlink/ = ~/.m2
+│   ├── kubernetes/            kubectl aliases, k9s completion, klog
+│   ├── docker/                aliases, completion path, dsh
+│   ├── gcloud/  go/  python/  ruby/  postgres/
 ├── profiles/                  company profiles; only README.md and _template/ are committed
 ├── script/                    bootstrap, dot, install, profile, test-linux (+ lib/common.sh, test/)
 ├── Brewfile                   global CLI tools and apps, grouped and commented
 └── AGENTS.md                  context for AI agents working on this repo
 ```
 
-| Feature                                                                                      | What it holds                                                                           |
-|----------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
-| `zsh/`                                                                                       | `zshrc.symlink` (the loader), options, key bindings, general aliases                    |
-| `system/`                                                                                    | env vars (`env.zsh`), `ls` aliases, grc; `env.local.zsh` for git-ignored machine tweaks |
-| `git/`                                                                                       | `gitconfig.symlink`, global hooks, fzf git helpers, `GITHUB_TOKEN` reference            |
-| `secrets/`                                                                                   | `secret` and `with-secrets` (Proton Pass + OS keychain cache)                           |
-| `platform/`                                                                                  | OS detection (`$DOTFILES_OS`), Linux shims for `pbcopy`/`pbpaste`/`open`, apt prerequisites |
-| `ssh/`                                                                                       | Proton Pass SSH agent, `ssh/config` included from `~/.ssh/config`                       |
-| `m2.symlink/`                                                                                | `~/.m2`: Maven wrappers that inject secrets, `settings.xml.example`                     |
-| `functions/`                                                                                 | small standalone commands (see [below](#custom-functions))                              |
-| `oh-my-posh/`, `iterm/`, `fzf-tab/`                                                          | prompt theme, iTerm2 profile, fzf tab completion                                        |
-| `docker/`, `k9s/`, `direnv/`, `go/`, `pyenv/`, `rbenv/`, `sdkman/`, `postgres/`, `homebrew/` | per-tool PATH, init, completion, installers                                             |
+A feature folder can contain:
+
+```
+<feature>/
+├── _path.zsh              sourced first (PATH, fpath)
+├── *.zsh                  sourced on shell start (aliases.zsh, init.zsh, ...)
+├── completion.zsh         sourced after compinit
+├── functions/             one file per command, autoloaded
+├── bin/                   executables (put on PATH by the feature's _path.zsh)
+├── install.sh             run by `dot` / script/install
+├── secrets.refs           secrets this feature needs (references, never values)
+└── *.symlink              linked into $HOME as .<name> by bootstrap
+```
+
+Where does a new thing go? Tool-specific (a CLI, language, SDK) →
+`packages/<tool>/`. Shell look and feel → `shell/`. Needed by everything →
+`core/`. Credentials and keys → `security/`. Big enough to be its own world →
+top level (like `git/`). Features are never deeper than `category/feature/`:
+the loader only looks at those two levels (see below).
 
 ### How a shell starts
 
-`zsh/zshrc.symlink` (= `~/.zshrc`) collects `$DOTFILES/*/*.zsh` and then the
-active profile's `~/.config/dotfiles/profile/*/*.zsh`, and sources them in
-three passes:
+`core/zsh/zshrc.symlink` (= `~/.zshrc`) collects `$DOTFILES/*/*.zsh` and
+`$DOTFILES/*/*/*.zsh` (top-level features and features inside a category,
+`profiles/` excluded), then the active profile's
+`~/.config/dotfiles/profile/*/*.zsh`, and sources them in three passes:
 
 1. every `_path.zsh`,
 2. everything else except completions,
 3. `compinit`, then every `completion.zsh`.
 
-Profile files come after global files in each pass, so a profile can override
-anything. The globs are depth-limited on purpose: `m2.symlink/repository` holds
-over 16k directories.
+Every `<feature>/functions/` folder is autoloaded too. Profile files come after
+global files in each pass, so a profile can override anything. The globs are
+depth-limited on purpose: `packages/maven/m2.symlink/repository` holds over 16k
+directories.
 
 ## Everyday commands
 
@@ -142,7 +168,7 @@ Everything else follows from it:
 | `<feature>/*.zsh`, `_path.zsh`, `completion.zsh` | sourced by `~/.zshrc` after the global ones                            |
 | `<feature>/functions/*`                          | autoloaded as commands                                                 |
 | `git/gitconfig`                                  | included **last** by `git/gitconfig.symlink` (work email, credentials) |
-| `ssh/config`                                     | included by `ssh/config` (company hosts)                               |
+| `ssh/config`                                     | included by `security/ssh/config` (company hosts)                      |
 | `<feature>/secrets.refs`                         | used by `secret` / `with-secrets`; overrides global names              |
 | `<feature>/Brewfile`, `install.sh`               | run by `dot`                                                           |
 | `<feature>/activate.sh`, `deactivate.sh`         | run by `profile use` / `profile off` (e.g. link `~/.m2/settings.xml`)  |
@@ -186,7 +212,7 @@ When a tool asks for a token, or `secret scan` reports **MISSING**, declare it:
 ```sh
 secret add NAME   # link it to an EXISTING Proton Pass item
 secret new NAME   # create a NEW login item in Proton Pass, then link it
-#  --feature git | m2.symlink | profile:artifactory   where to declare it (asks if omitted)
+#  --feature git | packages/maven | profile:artifactory   where to declare it (asks if omitted)
 #  --ttl 12h | 7d | 0 | forever                        cache lifetime (default 7d)
 ```
 
@@ -237,10 +263,10 @@ command anyway.
 SSH keys live in Proton Pass, and the **Proton Pass SSH agent** serves them,
 so no private key sits on disk.
 
-- [`ssh/agent.zsh`](ssh/agent.zsh) starts `pass-cli ssh-agent daemon` in the
+- [`security/ssh/agent.zsh`](security/ssh/agent.zsh) starts `pass-cli ssh-agent daemon` in the
   background if it isn't running (requires `secret login`) and exports
   `SSH_AUTH_SOCK=~/.ssh/proton-pass-agent.sock`.
-- [`ssh/install.sh`](ssh/install.sh) adds `Include ~/.dotfiles/ssh/config` at the
+- [`security/ssh/install.sh`](security/ssh/install.sh) adds `Include ~/.dotfiles/security/ssh/config` at the
   top of `~/.ssh/config`. That config sets `IdentityAgent` to the socket and
   includes the active profile's `ssh/config`.
 - `ssh-keys` lists the keys the agent serves; `ssh-agent-status` and
@@ -255,13 +281,41 @@ so no private key sits on disk.
 created by bootstrap, git-ignored), then the active profile's `git/gitconfig`
 (work email, company hosts), which wins. Commits are not signed
 (`commit.gpgsign = false`). `gpg.format = ssh` is kept so `git commit -S` signs
-with a key from the agent. The global `commit-msg` hook appends a ticket key
-(`ABC-123`) taken from the branch name.
+with a key from the agent.
 
-**Maven.** `~/.m2` is `m2.symlink/`. The real `~/.m2/settings.xml` is
+**Git hooks.** `core.hooksPath` points every repo at
+[`git/git_global.symlink/hooks`](git/git_global.symlink/hooks). Each hook there
+is a stub for `_dispatch`, which first runs the repo's own `.git/hooks/<name>`
+(pre-commit framework, husky-less setups, ...) and then the dotfiles
+implementation in `hooks.d/<name>`, so repo hooks keep working. Repos that set
+their own `core.hooksPath` (husky, lefthook) are unaffected.
+
+**Jira ticket.** `hooks.d/commit-msg` adds the branch's ticket as the last line
+of the message (before trailers like `Co-authored-by:`):
+`feature/WEAV-123-login` → `WEAV-123`. Detection is strict to avoid false
+positives: the key must stand alone in the branch name (any case), common
+look-alikes (`UTF-8`, `SHA-256`, `ISO-8601`, `CVE-…`, `X86-64`) are ignored,
+and when the branch has two different candidates nothing is added. Nothing is
+added either when the message already mentions a ticket, for merges,
+`fixup!`/`squash!` commits, or on `main`/`master`/`develop`/`dev`/`trunk`. It
+never prompts; it prints a hint instead.
+
+```sh
+git ticket                 # what would be added on this branch, and why
+git ticket WEAV-123        # force a ticket for this branch
+git ticket none            # never add one on this branch
+git ticket --clear         # back to automatic
+git config hooks.ticketProjects "WEAV PLAT"   # only these keys (best: in the profile's git/gitconfig)
+git config hooks.ticket false                 # disable in this repo
+SKIP_TICKET=1 git commit ...                  # skip once
+```
+
+`script/test/git-hooks.sh` tests all of this with real commits.
+
+**Maven.** `~/.m2` is `packages/maven/m2.symlink/`. The real `~/.m2/settings.xml` is
 git-ignored. Profiles provide it (e.g. linked by `artifactory/activate.sh`),
 and it must reference credentials as `${env.NAME}`, never inline.
-[`m2.symlink/maven.zsh`](m2.symlink/maven.zsh) wraps `mvn` and the
+[`packages/maven/maven.zsh`](packages/maven/maven.zsh) wraps `mvn` and the
 `mw`/`mwv`/`mwi` aliases (`./mvnw`) with `with-secrets`. IDEs that run Maven
 themselves don't get these variables: set them in the IDE run configuration,
 or launch the IDE through `with-secrets`.
@@ -272,12 +326,14 @@ or launch the IDE through `with-secrets`.
 
 Aliases live next to the feature they belong to:
 
-- [`zsh/aliases.zsh`](zsh/aliases.zsh): general shortcuts (`g`=git, `k`=kubectl,
+- [`core/zsh/aliases.zsh`](core/zsh/aliases.zsh): general shortcuts (`g`=git,
   directory jumps `..`/`...`, and modern-tool replacements like `eza`/`rg`/`lazygit`
   that only activate when installed).
-- [`m2.symlink/maven.zsh`](m2.symlink/maven.zsh): `mw`, `mws`, `mwv`, `mwi`.
-- [`system/aliases.zsh`](system/aliases.zsh): `ls`/`l`/`ll`/`la`.
-- [`ssh/agent.zsh`](ssh/agent.zsh): `ssh-keys`, `ssh-agent-status`, `ssh-agent-restart`.
+- `packages/<tool>/aliases.zsh`: tool shortcuts, e.g. `k`/`kgp`/`kns` (kubernetes),
+  `docker-clean` (docker), `intellij`/`gw` (java).
+- [`packages/maven/maven.zsh`](packages/maven/maven.zsh): `mw`, `mws`, `mwv`, `mwi`.
+- [`core/system/aliases.zsh`](core/system/aliases.zsh): `ls`/`l`/`ll`/`la`.
+- [`security/ssh/agent.zsh`](security/ssh/agent.zsh): `ssh-keys`, `ssh-agent-status`, `ssh-agent-restart`.
 - [`git/aliases.zsh`](git/aliases.zsh): fzf git helpers. `jira`/`gcoa` fuzzy-checkout
   a branch, `gco` a local branch, `gbd` fuzzy-deletes branches, `glog` browses
   history, `gstash` manages stashes, `gfixup` picks a commit to fixup and
@@ -286,8 +342,10 @@ Aliases live next to the feature they belong to:
 
 ### Custom functions
 
-Files in [`functions/`](functions) are autoloaded, so each file name becomes a
-command. Profiles can add their own in `<feature>/functions/`.
+Every `<feature>/functions/` folder is autoloaded, so each file name becomes a
+command. General ones live in [`core/functions/`](core/functions); tool-specific
+ones next to their tool (`packages/kubernetes/functions/klog`, ...). Profiles
+can add their own the same way.
 
 | Command             | What it does                                                             |
 |---------------------|--------------------------------------------------------------------------|
@@ -305,19 +363,19 @@ Run any of them with `-h`/`--help` for usage.
 
 ### Shell plugins & tools
 
-Wired up (in the right order) by [`zsh/zshrc.symlink`](zsh/zshrc.symlink), all guarded:
+Wired up (in the right order) by [`core/zsh/zshrc.symlink`](core/zsh/zshrc.symlink), all guarded:
 
 - **fzf**: `Ctrl-T` file picker, `Alt-C` cd, fuzzy completion; powers the git
   helpers and the `secret add` pickers.
 - **atuin**: SQLite-backed history search. Owns `Ctrl-R` (loaded after fzf) and
   is started with `--disable-up-arrow`. Import old history with `atuin import auto`.
 - **fzf-tab**: fzf-powered tab completion, cloned to `~/.zsh/fzf-tab` by
-  [`fzf-tab/install.sh`](fzf-tab/install.sh).
+  [`shell/fzf-tab/install.sh`](shell/fzf-tab/install.sh).
 - **zoxide**: `z <partial>` jumps to frecent directories.
 - **direnv**: per-directory env via `.envrc` (`direnv allow`). A handy place
   for per-project, non-secret variables.
-- **oh-my-posh**: prompt theme vendored at [`oh-my-posh/theme.omp.json`](oh-my-posh/theme.omp.json).
-  It needs the Nerd Font from the Brewfile. [`iterm/install.sh`](iterm/install.sh)
+- **oh-my-posh**: prompt theme vendored at [`shell/prompt/theme.omp.json`](shell/prompt/theme.omp.json).
+  It needs the Nerd Font from the Brewfile. [`shell/iterm/install.sh`](shell/iterm/install.sh)
   installs and defaults a matching iTerm2 profile, "Dotfiles (FiraCode Nerd
   Font)" (opt out with `DOTFILES_ITERM_DEFAULT=0`).
 - **eza** icons, **bat** man pages, **zsh-autosuggestions**, **zsh-syntax-highlighting** (sourced last).

@@ -34,7 +34,7 @@ Every file is optional.
 ```
 profiles/<name>/
   git/gitconfig              # included last by git/gitconfig.symlink (email, credentials, url rewrites)
-  ssh/config                 # included by ssh/config (Host blocks for company servers)
+  ssh/config                 # included by security/ssh/config (Host blocks for company servers)
   <feature>/_path.zsh        # sourced first at shell start (PATH)
   <feature>/*.zsh            # sourced at shell start, after the global files (can override)
   <feature>/completion.zsh   # sourced after compinit
@@ -52,8 +52,8 @@ Hooks get `DOTFILES`, `PROFILE_NAME` and `PROFILE_DIR` in their environment.
 
 The active profile is a symlink: `~/.config/dotfiles/profile -> profiles/<name>`.
 
-- `zsh/zshrc.symlink` loads `~/.config/dotfiles/profile/*/*.zsh` and autoloads its `*/functions/`.
+- `core/zsh/zshrc.symlink` loads `~/.config/dotfiles/profile/*/*.zsh` and autoloads its `*/functions/`.
 - `git/gitconfig.symlink` includes `~/.config/dotfiles/profile/git/gitconfig`.
-- `ssh/config` includes `~/.config/dotfiles/profile/ssh/config`.
+- `security/ssh/config` includes `~/.config/dotfiles/profile/ssh/config`.
 - `script/install` runs the profile's `*/Brewfile` and `*/install.sh`.
 - `secret` / `with-secrets` read the profile's `*/secrets.refs`.

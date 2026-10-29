@@ -109,8 +109,10 @@
     # speed up status and diff on big repos using the filesystem monitor
     fsmonitor = true
     untrackedCache = true
+    # Global hooks for EVERY repo (ticket footer, ...). The dispatcher there
+    # still runs each repo's own .git/hooks/<name>. See git/git_global.symlink.
+    hooksPath = ~/.git_global/hooks
 [init]
-    templatedir = ~/.git_global
     defaultBranch = main
 [commit]
     gpgsign = false

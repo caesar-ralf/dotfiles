@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+#
+# commit-msg (dotfiles-managed): add the Jira ticket of the current branch as
+# a footer line.
+#
+#   branch  feature/WEAV-1234-fix-login   ->   "<message>\n\nWEAV-1234"
+#
+# Detection is strict, to avoid false positives:
+#   * A ticket is KEY-NUMBER. KEY is a letter followed by 1-9 letters/digits;
+#     NUMBER is 1-7 digits without a leading zero. It must stand alone
+#     (start/end or a non-alphanumeric character on both sides). Branch names
+#     are matched case-insensitively (feature/weav-12-x -> WEAV-12).
+#   * If `hooks.ticketProjects` is set (e.g. "WEAV PLAT", best set in a
+#     company profile's git/gitconfig), ONLY those keys count. Otherwise
+#     common non-ticket tokens are ignored (UTF-8, SHA-256, ISO-8601,
+#     CVE-2024-1, RFC-1234, X86-64, ...).
+#   * A per-branch override always wins: `git ticket WEAV-1` / `git ticket none`
+#     (stored as git config branch.<name>.ticket).
+#   * Several different candidates -> nothing is added; a warning explains how
+#     to pick one. This hook never prompts.
+#
+# Nothing is added when: the message already mentions a ticket; merge
+# commits; fixup!/squash!/amend! commits; detached HEAD; branches listed in
+# hooks.ticketSkipBranches (default: main master develop dev trunk);
+# SKIP_TICKET=1; or hooks.ticket=false (per repo).
+#
+# Existing trailers (Signed-off-by:, Co-authored-by:, ...) stay last: the
+# ticket is inserted before them.
+#
+# Usage by git: commit-msg <message-file>
+# Diagnostics:  commit-msg --detect   (used by `git ticket`)
+#
+# Portable bash (macOS bash 3.2 / BSD awk, Linux bash 5 / GNU awk).
+
+set -u
+
+if [ -t 2 ]; then
+    C_INFO='\033[0;34m'; C_WARN='\033[0;33m'; C_KEY='\033[0;36m'; C_OK='\033[0;32m'; C_RST='\033[0m'
+else
+    C_INFO=''; C_WARN=''; C_KEY=''; C_OK=''; C_RST=''
+fi
+info() { printf "  ${C_INFO}ticket${C_RST}: %b\n" "$1" >&2; }
+warn() { printf "  ${C_WARN}ticket${C_RST}: %b\n" "$1" >&2; }
+
+# Tokens that look like KEY-NUMBER but are not Jira tickets. Only used when
+# hooks.ticketProjects is not set.
+DENY="UTF UCS ISO IEC SHA MD RFC CVE CWE GHSA HTTP HTTPS TLS SSL SSH UTC GMT IPV4 IPV6 IPV
+X86 X64 ARM ARM64 AMD AMD64 AARCH64 WIN WIN32 WIN64 JDK JRE JSR JEP PEP ES ECMA ECMASCRIPT
+GPL LGPL AGPL MIT BSD APACHE MPL CC PR MR BUG ISSUE TODO FIXME RC BETA ALPHA BUILD
+NODE PYTHON PY JAVA GO RUBY PHP NET DOTNET K8S V VERSION VER PART STEP PHASE TOP"
+
+config() { git config --get "$1" 2>/dev/null; }
+
+PATTERN="$(config hooks.ticketPattern)"          # legacy override (regex)
+PROJECTS="$(config hooks.ticketProjects | tr '[:lower:],' '[:upper:] ')"
+SKIP_BRANCHES="$(config hooks.ticketSkipBranches)"
+SKIP_BRANCHES="${SKIP_BRANCHES:-main master develop dev trunk}"
+
+# Print stand-alone KEY-NUMBER tokens found in $1, one per line, in order.
+# $2 = "branch" (case-insensitive) or "message" (as written).
+raw_candidates() {
+    if [ -n "$PATTERN" ]; then
+        printf '%s\n' "$1" | grep -Eo "$PATTERN" || true
+        return
+    fi
+    printf '%s\n' "$1" | awk -v mode="$2" '
+        function alnum(c) { return c ~ /[A-Za-z0-9]/ }
+        {
+            line = $0
+            if (mode == "branch") line = toupper(line)
+            n = length(line); i = 1
+            while (i <= n) {
+                rest = substr(line, i)
+                if (!match(rest, /[A-Z][A-Z0-9]*-[0-9]+/)) break
+                s = i + RSTART - 1; l = RLENGTH
+                b = (s == 1) ? "" : substr(line, s - 1, 1)
+                a = (s + l > n) ? "" : substr(line, s + l, 1)
+                if ((b == "" || !alnum(b)) && (a == "" || !alnum(a))) print substr(line, s, l)
+                i = s + 1
+            }
+        }'
+}
+
+valid_ticket() {
+    local key="${1%-*}" num="${1##*-}"
+    [ -n "$PATTERN" ] && return 0
+    [ ${#key} -ge 2 ] && [ ${#key} -le 10 ] || return 1
+    [[ "$num" =~ ^[1-9][0-9]{0,6}$ ]] || return 1
+    if [ -n "$PROJECTS" ]; then
+        case " $PROJECTS " in *" $key "*) return 0 ;; *) return 1 ;; esac
+    fi
+    case " $(printf '%s' "$DENY" | tr '\n' ' ') " in *" $key "*) return 1 ;; esac
+    return 0
+}
+
+# Unique valid tickets in $1 ($2 = branch|message), one per line.
+candidates() {
+    local t
+    raw_candidates "$1" "$2" | awk '!seen[$0]++' | while IFS= read -r t; do
+        valid_ticket "$t" && printf '%s\n' "$t"
+    done
+}
+
+# Decide the ticket for branch $1. Sets TICKET (may be empty) and REASON.
+decide() {
+    local branch="$1" override cands count
+    TICKET="" REASON=""
+    override="$(config "branch.${branch}.ticket")"
+    if [ "$override" = "none" ]; then
+        REASON="disabled for this branch (undo: git ticket --clear)"
+        return
+    elif [ -n "$override" ]; then
+        TICKET="$override"
+        REASON="branch override (git ticket)"
+        return
+    fi
+    cands="$(candidates "$branch" branch)"
+    count="$(printf '%s' "$cands" | grep -c . || true)"
+    case "$count" in
+        0) REASON="no ticket found in branch name${PROJECTS:+ (projects: $PROJECTS)}" ;;
+        1) TICKET="$cands"; REASON="from branch name" ;;
+        *) REASON="ambiguous branch name, candidates: $(printf '%s' "$cands" | tr '\n' ' ')" ;;
+    esac
+}
+
+current_branch() { git symbolic-ref --quiet --short HEAD 2>/dev/null || true; }
+
+is_skipped_branch() {
+    local b
+    for b in $SKIP_BRANCHES; do [ "$1" = "$b" ] && return 0; done
+    return 1
+}
+
+# --- diagnostics mode (git ticket) -----------------------------------------
+if [ "${1:-}" = "--detect" ]; then
+    branch="$(current_branch)"
+    [ -n "$branch" ] || { echo "detached HEAD: no ticket"; exit 0; }
+    decide "$branch"
+    echo "branch:   $branch"
+    echo "projects: ${PROJECTS:-(any, with built-in false-positive filter)}"
+    if is_skipped_branch "$branch"; then
+        echo "ticket:   - (branch is in hooks.ticketSkipBranches)"
+    else
+        echo "ticket:   ${TICKET:--}"
+    fi
+    echo "why:      $REASON"
+    exit 0
+fi
+
+# --- commit-msg mode ---------------------------------------------------------
+MSG_FILE="${1:?usage: commit-msg <message-file> | --detect}"
+
+[ "${SKIP_TICKET:-0}" = "1" ] && exit 0
+[ "$(git config --type=bool --get hooks.ticket 2>/dev/null)" = "false" ] && exit 0
+[ -f "$(git rev-parse --git-path MERGE_HEAD 2>/dev/null)" ] && exit 0
+
+branch="$(current_branch)"
+[ -n "$branch" ] || exit 0
+is_skipped_branch "$branch" && exit 0
+
+cc="$(config core.commentChar)"
+case "$cc" in ""|auto) cc="#" ;; esac
+scissors="$cc ------------------------ >8 ------------------------"
+
+# The real message: above the scissors line, without comment lines.
+message="$(awk -v sc="$scissors" -v cc="$cc" '
+    $0 == sc { exit }
+    index($0, cc) == 1 { next }
+    { print }' "$MSG_FILE")"
+
+# Empty message: git will abort the commit anyway.
+printf '%s' "$message" | grep -q '[^[:space:]]' || exit 0
+
+case "$(printf '%s\n' "$message" | sed -n '1p')" in
+    "fixup! "*|"squash! "*|"amend! "*) exit 0 ;;
+esac
+
+existing="$(candidates "$message" message | head -n1)"
+if [ -n "$existing" ]; then
+    info "message already references ${C_KEY}${existing}${C_RST}"
+    exit 0
+fi
+
+decide "$branch"
+if [ -z "$TICKET" ]; then
+    case "$REASON" in
+        disabled*) ;;
+        *) warn "$REASON. Nothing added."
+           warn "Pick one for this branch: ${C_OK}git ticket ABC-123${C_RST} (or ${C_OK}git ticket none${C_RST})." ;;
+    esac
+    exit 0
+fi
+
+# Append the ticket as a footer; keep a trailing trailer block (Key: value
+# lines, e.g. Signed-off-by) after it.
+printf '%s\n' "$message" | awk -v ticket="$TICKET" '
+    { line[NR] = $0 }
+    END {
+        last = NR
+        while (last > 0 && line[last] ~ /^[[:space:]]*$/) last--
+        # Start of the last paragraph.
+        start = last
+        while (start > 1 && line[start - 1] !~ /^[[:space:]]*$/) start--
+        trailers = (start > 1)
+        for (i = start; i <= last && trailers; i++)
+            if (line[i] !~ /^[A-Za-z0-9][A-Za-z0-9-]*: /) trailers = 0
+        if (trailers) {
+            body_end = start - 1
+            while (body_end > 0 && line[body_end] ~ /^[[:space:]]*$/) body_end--
+            for (i = 1; i <= body_end; i++) print line[i]
+            print ""; print ticket; print ""
+            for (i = start; i <= last; i++) print line[i]
+        } else {
+            for (i = 1; i <= last; i++) print line[i]
+            print ""; print ticket
+        }
+    }' > "$MSG_FILE.ticket" && mv "$MSG_FILE.ticket" "$MSG_FILE"
+
+info "added ${C_KEY}${TICKET}${C_RST} (${REASON})"

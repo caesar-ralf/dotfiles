@@ -45,7 +45,7 @@ while test $# -gt 0; do
     case "$1" in
         -h|--help)      usage 0 ;;
         -e|--edit)      exec "${EDITOR:-vim}" "${DOTFILES}" ;;
-        -s|--secrets)   exec "${DOTFILES}/secrets/bin/secret" status ;;
+        -s|--secrets)   exec "${DOTFILES}/security/secrets/bin/secret" status ;;
         --no-update)    DO_UPDATE=false ;;
         --no-edit)      ;; # accepted for compatibility with bootstrap
         *)              warn "Invalid option: $1"; usage 1 ;;
@@ -66,12 +66,12 @@ export DOTFILES_WIZARD_GREETED=1
 # Linux: apt prerequisites (zsh, Linuxbrew build deps, clipboard, secret-tool).
 if is_linux; then
     header "Linux prerequisites"
-    "${DOTFILES}/platform/install.sh" 2>&1
+    "${DOTFILES}/core/platform/install.sh" 2>&1
 fi
 
 # Install Homebrew (no-op if already present).
 header "Homebrew"
-"${DOTFILES}/homebrew/install.sh" 2>&1
+"${DOTFILES}/core/homebrew/install.sh" 2>&1
 load_brew || true
 
 # Upgrade Homebrew formulae metadata.

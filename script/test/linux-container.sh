@@ -16,9 +16,9 @@ export HOME=/root USER=root SHELL=/usr/bin/zsh
 mkdir -p "$HOME/.dotfiles"
 cp -a /src/. "$HOME/.dotfiles/"
 D="$HOME/.dotfiles"
-ln -sfn "$D/zsh/zshrc.symlink" "$HOME/.zshrc"
+ln -sfn "$D/core/zsh/zshrc.symlink" "$HOME/.zshrc"
 ln -sfn "$D/git/gitconfig.symlink" "$HOME/.gitconfig"
-ln -sfn "$D/m2.symlink" "$HOME/.m2"
+ln -sfn "$D/packages/maven/m2.symlink" "$HOME/.m2"
 printf '[user]\n    name = CI\n    email = personal@example.com\n' > "$HOME/.gitconfig.local"
 
 # Fake pass-cli: always logged in; `item view ... --field F` prints "dummy-<field>".
@@ -55,11 +55,11 @@ echo "    $out"
 check "profile env, git include and functions active" '[ "$out" = "var=on email=work@example.com fn=profile-hello: function" ]'
 
 echo "=== secrets without cache (no D-Bus)"
-check "backend none" '[ "$(bash -c "source secrets/lib.sh; secrets_cache_backend")" = none ]'
-got="$(secrets/bin/secret GITHUB_TOKEN 2>&1)"
+check "backend none" '[ "$(bash -c "source security/secrets/lib.sh; secrets_cache_backend")" = none ]'
+got="$(security/secrets/bin/secret GITHUB_TOKEN 2>&1)"
 check "secret GITHUB_TOKEN (got: $got)" '[ "$got" = dummy-password ]'
-check "profile ref visible" 'secrets/bin/secret list | grep -q "^CI_TOKEN"'
-out="$(secrets/bin/with-secrets -- sh -c 'echo "$GITHUB_TOKEN/$CI_TOKEN"')"
+check "profile ref visible" 'security/secrets/bin/secret list | grep -q "^CI_TOKEN"'
+out="$(security/secrets/bin/with-secrets -- sh -c 'echo "$GITHUB_TOKEN/$CI_TOKEN"')"
 check "with-secrets injects global + profile secrets" '[ "$out" = "dummy-password/dummy-password" ]'
 
 echo "=== secrets with libsecret cache (throwaway GNOME Keyring)"
@@ -76,9 +76,9 @@ keyring_attempt() {
       done
       secret-tool clear service dotfiles-warmup >/dev/null 2>&1
       [ "$ready" = 1 ] || exit 2
-      [ "$(bash -c "source secrets/lib.sh; secrets_cache_backend")" = libsecret ] || { echo "    backend is not libsecret"; exit 1; }
-      secrets/bin/secret forget >/dev/null; : > /tmp/pass-cli.calls
-      a="$(secrets/bin/secret GITHUB_TOKEN)"; b="$(secrets/bin/secret GITHUB_TOKEN)"
+      [ "$(bash -c "source security/secrets/lib.sh; secrets_cache_backend")" = libsecret ] || { echo "    backend is not libsecret"; exit 1; }
+      security/secrets/bin/secret forget >/dev/null; : > /tmp/pass-cli.calls
+      a="$(security/secrets/bin/secret GITHUB_TOKEN)"; b="$(security/secrets/bin/secret GITHUB_TOKEN)"
       n=$(grep -c "item view" /tmp/pass-cli.calls)
       if [ "$a" != dummy-password ] || [ "$b" != "$a" ] || [ "$n" != 1 ]; then
           # A write right after start-up can still be lost; only count it if the
@@ -87,7 +87,7 @@ keyring_attempt() {
           [ "$(secret-tool lookup service dotfiles-probe 2>/dev/null)" = y ] || exit 2
           echo "    cache miss on 2nd lookup (pass-cli calls=$n)"; exit 1
       fi
-      secrets/bin/secret forget GITHUB_TOKEN >/dev/null
+      security/secrets/bin/secret forget GITHUB_TOKEN >/dev/null
       [ -z "$(secret-tool lookup service dotfiles name GITHUB_TOKEN 2>/dev/null)" ] || { echo "    forget left the entry"; exit 1; }
       exit 0
     ' 2>/dev/null
@@ -109,9 +109,15 @@ out="$(zsh -i -c 'echo "var=[${CI_PROFILE_VAR:-}] email=$(git config user.email)
 echo "    $out"
 check "profile fully unloaded" '[ "$out" = "var=[] email=personal@example.com" ]'
 
+echo "=== git hooks + Jira ticket detection (mawk, GNU tools)"
+out="$(bash script/test/git-hooks.sh 2>&1)"
+echo "$out" | grep -E "^FAIL" | sed "s/^/    /"
+check "git hooks" 'echo "$out" | grep -q "ALL HOOK CHECKS PASSED"'
+
 echo "=== bash syntax under GNU tools"
 for f in script/bootstrap script/dot script/install script/profile script/lib/common.sh \
-         secrets/lib.sh secrets/bin/secret secrets/bin/with-secrets platform/install.sh platform/linux-bin/*; do
+         security/secrets/lib.sh security/secrets/bin/secret security/secrets/bin/with-secrets core/platform/install.sh core/platform/linux-bin/* \
+         git/bin/git-ticket git/git_global.symlink/hooks/_dispatch git/git_global.symlink/hooks.d/commit-msg; do
     bash -n "$f" || failt "syntax $f"
 done
 pass "syntax"

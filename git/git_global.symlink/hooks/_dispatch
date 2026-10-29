@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#
+# _dispatch: every other file in this folder is a 2-line stub that execs this.
+#
+# git/gitconfig.symlink sets core.hooksPath=~/.git_global/hooks, so git uses
+# THIS folder for every repo. That would normally switch off each repo's own
+# .git/hooks/*, so for hook <name> we:
+#   1. run the repo's own hook (.git/hooks/<name>), if any, with git's stdin;
+#   2. then run the dotfiles implementation (../hooks.d/<name>), if any.
+# Either one failing aborts the git operation, like a normal hook.
+#
+# Copies of the old dotfiles ticket hook (installed into .git/hooks by the
+# previous init.templateDir setup) are recognised and skipped, so a legacy
+# copy can't add a ticket the new hook decided against.
+#
+# Repos that set their own core.hooksPath (husky, lefthook, ...) override this
+# global one, so they are unaffected.
+
+name="${1:?hook name}"
+shift
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+ours="$here/../hooks.d/$name"
+
+common="$(git rev-parse --git-common-dir 2>/dev/null)"
+repo_hook="${common:+$common/hooks/$name}"
+
+is_legacy_copy() { grep -q 'append the JIRA ticket parsed from the branch name' "$1" 2>/dev/null; }
+
+if [ -n "$repo_hook" ] && [ -x "$repo_hook" ] && ! is_legacy_copy "$repo_hook"; then
+    if [ -x "$ours" ]; then
+        "$repo_hook" "$@" || exit $?
+    else
+        exec "$repo_hook" "$@"
+    fi
+fi
+
+[ -x "$ours" ] && exec "$ours" "$@" </dev/null
+exit 0

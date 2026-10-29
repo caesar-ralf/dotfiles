@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Template for ~/.m2/settings.xml (the real file is git-ignored).
+
+  Never paste tokens here. Reference environment variables instead; the `mvn`
+  function and `mw*` aliases (packages/maven/maven.zsh) run Maven through
+  `with-secrets`, which fetches them from Proton Pass for that build only.
+  Secret names are declared in <feature>/secrets.refs files (`secret list`).
+
+  Company registries (Artifactory, Nexus, ...) belong in a profile: it ships
+  its own settings.xml and links it into ~/.m2 from <feature>/activate.sh.
+  See profiles/README.md.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 http://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <servers>
+    <!-- GitHub Packages. GITHUB_TOKEN is declared in git/secrets.refs. -->
+    <server>
+      <id>github</id>
+      <username>${env.GITHUB_USER}</username>
+      <password>${env.GITHUB_TOKEN}</password>
+    </server>
+  </servers>
+</settings>

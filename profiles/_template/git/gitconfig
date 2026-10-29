@@ -11,3 +11,9 @@
 # Directory-scoped identity, e.g. only for repos under ~/workspace/company:
 # [includeIf "gitdir:~/workspace/company/"]
 #     path = ~/.config/dotfiles/profile/git/gitconfig.work
+
+# Jira project keys used at this company. The commit-msg hook then ONLY adds
+# tickets with these keys (no false positives like UTF-8 or SHA-256).
+# Check what it would do on a branch with `git ticket`.
+# [hooks]
+#     ticketProjects = ABC DEF

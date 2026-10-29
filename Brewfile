@@ -8,7 +8,7 @@ tap 'homebrew/bundle'                          # lets `brew bundle` read this Br
 # =============================================================================
 # Shell, prompt & completion
 # =============================================================================
-brew 'oh-my-posh'                              # cross-shell prompt theme engine (uses oh-my-posh/theme.omp.json)
+brew 'oh-my-posh'                              # cross-shell prompt theme engine (uses shell/prompt/theme.omp.json)
 brew 'zsh-autosuggestions'                     # fish-style inline suggestions from history
 brew 'zsh-syntax-highlighting'                 # colours commands as you type (sourced last)
 brew 'fzf'                                     # fuzzy finder (Ctrl-R history, Ctrl-T files)

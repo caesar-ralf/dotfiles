@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# git ticket: show or override which Jira ticket the commit-msg hook adds on
+# the current branch (see git/git_global.symlink/hooks.d/commit-msg).
+#
+#   git ticket              show the decision for this branch and why
+#   git ticket WEAV-123     always use WEAV-123 on this branch
+#   git ticket none         never add a ticket on this branch
+#   git ticket --clear      back to automatic detection
+#
+# Restrict detection to your company's Jira project keys (fewer false
+# positives) in the profile's git/gitconfig, or per repo:
+#   git config hooks.ticketProjects "WEAV PLAT"
+
+set -o pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+hook="$here/../git_global.symlink/hooks.d/commit-msg"
+
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "git ticket: not in a git repository" >&2; exit 1; }
+branch="$(git symbolic-ref --quiet --short HEAD)" || { echo "git ticket: detached HEAD" >&2; exit 1; }
+
+case "${1:-}" in
+    "")
+        exec "$hook" --detect
+        ;;
+    -h|--help)
+        sed -n '3,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+        ;;
+    --clear)
+        git config --unset "branch.${branch}.ticket" 2>/dev/null
+        echo "ticket override cleared for ${branch}"
+        "$hook" --detect | sed -n '/^ticket:/p'
+        ;;
+    none)
+        git config "branch.${branch}.ticket" none
+        echo "no ticket will be added on ${branch}"
+        ;;
+    *)
+        t="$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')"
+        [[ "$t" =~ ^[A-Z][A-Z0-9]{1,9}-[1-9][0-9]{0,6}$ ]] || { echo "git ticket: '$1' is not a ticket like ABC-123" >&2; exit 1; }
+        git config "branch.${branch}.ticket" "$t"
+        echo "commits on ${branch} will get ${t}"
+        ;;
+esac

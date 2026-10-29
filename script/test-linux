@@ -21,12 +21,13 @@ command_exists docker || fail "docker is required."
 src="$(mktemp -d)"
 trap 'rm -rf "$src"' EXIT
 tar -C "$DOTFILES" \
-    --exclude=./.git --exclude=./.idea --exclude=./m2.symlink/repository \
-    --exclude='./m2.symlink/settings.xml*' --exclude=./profiles \
+    --exclude=./.git --exclude=./.idea --exclude=./packages/maven/m2.symlink/repository \
+    --exclude=./packages/maven/m2.symlink/wrapper \
+    --exclude='./packages/maven/m2.symlink/settings.xml*' --exclude=./profiles \
     -cf - . 2>/dev/null | tar -C "$src" -xf -
 mkdir -p "$src/profiles"
 cp -R "$DOTFILES/profiles/README.md" "$DOTFILES/profiles/_template" "$src/profiles/"
-cp "$DOTFILES/m2.symlink/settings.xml.example" "$src/m2.symlink/" 2>/dev/null
+cp "$DOTFILES/packages/maven/m2.symlink/settings.xml.example" "$src/packages/maven/m2.symlink/" 2>/dev/null
 
 header "Running Linux checks in $image"
 docker run --rm -v "$src:/src:ro" "$image" bash /src/script/test/linux-container.sh

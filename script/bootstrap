@@ -114,8 +114,10 @@ install_dotfiles() {
     local overwrite_all=false backup_all=false skip_all=false
     [ "${DOTFILES_YES:-0}" = "1" ] && skip_all=true
 
+    # Features live at most 2 levels deep (git/, packages/maven/), so their
+    # *.symlink entries are at depth <= 3. Profiles link their own files.
     local src dst
-    for src in $(find -H "${DOTFILES}" -maxdepth 2 -name '*.symlink' -not -path '*.git*'); do
+    for src in $(find -H "${DOTFILES}" -maxdepth 3 -name '*.symlink' -not -path '*.git*' -not -path "${DOTFILES}/profiles/*"); do
         dst="$HOME/.$(basename "${src%.*}")"
         link_file "$src" "$dst"
     done
@@ -137,7 +139,7 @@ install_dependencies() {
 
 setup_secrets() {
     header "Secrets (Proton Pass)"
-    local secret_cmd="${DOTFILES}/secrets/bin/secret"
+    local secret_cmd="${DOTFILES}/security/secrets/bin/secret"
     if ! command_exists pass-cli; then
         warn "pass-cli not found. Install the Proton Pass CLI, then run: secret login"
         return 0

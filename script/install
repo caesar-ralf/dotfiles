@@ -34,14 +34,14 @@ else
 fi
 
 # Find every topic installer and run it. Prune the huge Maven cache so we don't
-# walk 16k+ directories under m2.symlink/repository looking for install.sh, and
+# walk 16k+ directories under packages/maven/m2.symlink/repository looking for install.sh, and
 # prune profiles/ (only the ACTIVE profile is installed, below).
 header "Running topic installers"
 while IFS= read -r installer; do
     info "→ ${installer#"${DOTFILES}"/}"
     sh -c "$installer"
 done < <(find "${DOTFILES}" \
-            -path "${DOTFILES}/m2.symlink/repository" -prune -o \
+            -path "${DOTFILES}/packages/maven/m2.symlink/repository" -prune -o \
             -path "${DOTFILES}/profiles" -prune -o \
             -type f -name install.sh -print)
 

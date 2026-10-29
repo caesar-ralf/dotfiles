@@ -29,6 +29,23 @@ export DOTFILES="${DOTFILES:-$DOTFILES_ROOT}"
 DOTFILES_PROFILES_DIR="${DOTFILES}/profiles"
 export DOTFILES_PROFILE_LINK="${DOTFILES_PROFILE_LINK:-$HOME/.config/dotfiles/profile}"
 
+# Layout: a feature is a top-level folder (git/) or a folder inside one of
+# these category folders (core/zsh/, packages/maven/, ...). Never deeper.
+DOTFILES_CATEGORIES="core shell security packages"
+
+# Print every feature as a repo-relative path (git, core/zsh, packages/maven, ...).
+dotfiles_features() {
+    local d c name
+    for d in "$DOTFILES"/*/; do
+        name="$(basename "$d")"
+        case "$name" in profiles|script) continue ;; esac
+        case " $DOTFILES_CATEGORIES " in
+            *" $name "*) for c in "$d"*/; do [ -d "$c" ] && printf '%s/%s\n' "$name" "$(basename "$c")"; done ;;
+            *) printf '%s\n' "$name" ;;
+        esac
+    done
+}
+
 # Name of the active profile, or empty when none is active.
 active_profile() {
     [ -L "$DOTFILES_PROFILE_LINK" ] && [ -d "$DOTFILES_PROFILE_LINK" ] || return 0

@@ -4,12 +4,14 @@ Brewfile.lock.json
 bin/cloud_sql_proxy
 .idea/
 .DS_Store
+# stray folder some tools create when run with cwd=~/.dotfiles ("Application Support" split)
+/Support/
 
 # --- Maven cache & credentials (never commit) ---
-m2.symlink/repository/
-m2.symlink/wrapper/
-m2.symlink/settings.xml*
-!m2.symlink/settings.xml.example
+packages/maven/m2.symlink/repository/
+packages/maven/m2.symlink/wrapper/
+packages/maven/m2.symlink/settings.xml*
+!packages/maven/m2.symlink/settings.xml.example
 
 # --- Company profiles: each is its own PRIVATE repo, never committed here ---
 /profiles/*
@@ -19,7 +21,7 @@ m2.symlink/settings.xml*
 # --- Secrets: local, never-committed overrides ---
 # Any file ending in .local.zsh is machine-local and git-ignored.
 *.local.zsh
-system/env.local.zsh
+core/system/env.local.zsh
 git/gitconfig.local.symlink
 
 # --- Generic secret files ---
