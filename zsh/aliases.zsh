@@ -6,17 +6,12 @@ alias g='git'
 # docker aliases
 alias docker-rmi-dangling='docker rmi $(docker images -q -f dangling=true)'
 alias docker-clean='docker rm -f $(docker ps -aq); docker-rmi-dangling'
-alias docker-remote-images="curl -s 'https://hub.int.klarna.net/v2/_catalog?n=1000' | jq ."
 
 # code aliases
 alias intellij='open -a "IntelliJ IDEA"'
 alias gw=./gradlew
 
-# maven wrapper shortcuts
-alias mw='./mvnw'
-alias mws='./mvnw spotless:apply'        # format code
-alias mwv='./mvnw clean verify'          # full build + tests
-alias mwi='./mvnw clean install -DskipTests'
+# maven aliases live in m2.symlink/maven.zsh
 
 # kubernetes shortcuts
 alias k='kubectl'

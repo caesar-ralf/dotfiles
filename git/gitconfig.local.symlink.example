@@ -1,5 +1,6 @@
 [user]
         name = AUTHORNAME
+        # Personal email. A company profile overrides it (profiles/<name>/git/gitconfig).
         email = AUTHOREMAIL
         # Per-machine commit-signing key (kept out of the shared config).
         # For SSH signing (see [gpg] format = ssh in gitconfig.symlink), paste

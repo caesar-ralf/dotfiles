@@ -4,25 +4,45 @@ Simplified version of my dotfiles preferences. To start, just run `script/bootst
 
 ## Installing / updating
 
-- `script/bootstrap` — the one command to set up a fresh machine. It creates
+- `script/bootstrap`: the one command to set up a fresh machine. It creates
   `gitconfig`, symlinks every `*.symlink` file into `$HOME`, (on macOS) installs
-  all dependencies, and offers to set up your secrets. Safe to re-run; set
-  `DOTFILES_YES=1` to auto-confirm prompts.
-- `script/dot` — periodic maintenance. Updates Homebrew and re-runs every
+  all dependencies, checks your Proton Pass login, and points you at company
+  profiles. Safe to re-run; set `DOTFILES_YES=1` to auto-confirm prompts.
+- `script/dot`: periodic maintenance. Updates Homebrew and re-runs every
   installer. Flags: `--edit` (open the repo in `$EDITOR`), `--secrets`
-  (reconfigure secrets), `--no-update` (skip `brew update`), `--help`.
-- `script/install` — runs `brew bundle` against the [`Brewfile`](Brewfile) and
-  then executes **every** `*/install.sh` in the repo (Homebrew, SDKMAN, fzf-tab, …).
-- `script/secrets` — interactive secrets setup (see [Secrets](#secrets)).
+  (check Proton Pass + secret references), `--no-update` (skip `brew update`), `--help`.
+- `script/install`: runs `brew bundle` against the [`Brewfile`](Brewfile) and
+  then executes **every** `*/install.sh` in the repo (Homebrew, SDKMAN, fzf-tab, …),
+  plus the active profile's `*/Brewfile` and `*/install.sh`.
+- `script/profile`: switch company profiles on/off (see [Profiles](#company-profiles)).
 
 All scripts share [`script/lib/common.sh`](script/lib/common.sh) for consistent,
 colourful output (colours auto-disable when piped or when `NO_COLOR` is set).
 Once the dotfiles are installed, `script/` is on your `PATH`, so you can just run
-`dot`, `bootstrap` or `secrets` from anywhere.
+`dot`, `bootstrap` or `profile` from anywhere.
 
-Each topic folder is self-contained: drop an `install.sh` in a folder, and it is
-picked up automatically. The [`Brewfile`](Brewfile) lists every CLI tool and GUI
-app, grouped by feature with a one-line comment explaining each entry.
+The repo is organised **by feature**: each top-level folder is self-contained
+(its `*.zsh`, `_path.zsh`, `completion.zsh`, `install.sh`, `secrets.refs`, …),
+so removing a feature means deleting one folder. The [`Brewfile`](Brewfile)
+lists every CLI tool and GUI app, grouped by feature with a one-line comment
+explaining each entry.
+
+## Company profiles
+
+Nothing company-specific is committed here. Work email, internal hosts, package
+registries and company-only commands live in a **profile**: `profiles/<name>/`,
+a separate **private** git repo that this repo ignores. It uses the same
+one-folder-per-feature layout.
+
+```sh
+profile list                # available profiles (* = active)
+profile use acme            # activate / switch
+profile off                 # deactivate
+profile new acme            # start one from profiles/_template
+profile clone <url>         # fetch an existing private profile repo
+```
+
+See [`profiles/README.md`](profiles/README.md) for the layout and hooks.
 
 ## Aliases
 
@@ -104,51 +124,47 @@ all guarded so a fresh machine still boots if something is missing:
 
 ## Secrets
 
-**No secrets are ever committed to this repo.** Everything sensitive is loaded at
-runtime from either the macOS Keychain (preferred) or a git-ignored local file.
+**No secrets are stored anywhere by these dotfiles**: not in git, not in a
+profile, not in the Keychain. They stay in **Proton Pass** and are fetched with
+the Proton Pass CLI (`pass-cli`) only when a command needs them.
 
-### Guided setup (recommended)
-
-```sh
-script/secrets            # interactive: prompts for each secret, stores in Keychain
-script/secrets --status   # show which expected secrets are already set
-script/secrets --local    # create system/env.local.zsh from the example
-```
-
-`script/secrets` knows which secrets this setup expects (`GITHUB_TOKEN`,
-`ARTIFACTORY_USER`, `ARTIFACTORY_TOKEN`), skips ones already stored (unless you
-choose to update them), and hides secret values while you type. It is also run
-automatically as the last step of `script/bootstrap`.
-
-### Storing a secret in the Keychain (manual)
+A feature that needs a secret declares a *reference* in a `secrets.refs` file
+next to it (global, or inside a profile feature):
 
 ```sh
-secret-set GITHUB_TOKEN
-secret-set ARTIFACTORY_USER
-secret-set ARTIFACTORY_TOKEN
+# git/secrets.refs
+GITHUB_TOKEN=pass://Personal/GitHub Token/password   # pass://<vault>/<item title>/<field>
 ```
-
-`system/env.zsh` reads these on shell start via `secret NAME` and exports them
-only if present. The first Keychain read per app may prompt once - choose "Always Allow".
-
-### Or use a git-ignored local file
 
 ```sh
-cp system/env.local.zsh.example system/env.local.zsh
-# edit system/env.local.zsh and add your exports
+secret login                 # log in to Proton Pass once (pass-cli login)
+secret status                # check login + that every reference resolves (values never shown)
+secret list                  # NAME -> reference, and which file declared it
+secret GITHUB_TOKEN          # print one secret (e.g. | pbcopy)
+with-secrets -- mvn verify   # run ONE command with all referenced secrets in its env
+with-secrets GITHUB_TOKEN -- gh pr list   # ...or only the ones you name
 ```
 
-`*.local.zsh` and `system/env.local.zsh` are git-ignored and auto-sourced after
-`env.zsh`.
+`mvn` and the `mw*` aliases already go through `with-secrets` (see
+[`m2.symlink/maven.zsh`](m2.symlink/maven.zsh)), so `${env.NAME}` references in
+`~/.m2/settings.xml` just work. A variable already set in your environment
+(e.g. via direnv) is not fetched again.
 
-### Maven / Artifactory
+Machine-local, non-secret overrides go in `system/env.local.zsh` (git-ignored,
+copy it from `system/env.local.zsh.example`).
 
-The real `~/.m2/settings.xml` is git-ignored because Artifactory bakes a personal
-JWT into it. Use `m2.symlink/settings.xml.example` as a template that references
-`${env.ARTIFACTORY_USER}` / `${env.ARTIFACTORY_TOKEN}` instead of hard-coding them.
+### SSH keys
+
+SSH keys live in Proton Pass, and the **Proton Pass SSH agent** serves them.
+[`ssh/agent.zsh`](ssh/agent.zsh) starts the daemon in the background when it
+isn't running and exports `SSH_AUTH_SOCK`. [`ssh/install.sh`](ssh/install.sh)
+adds `Include ~/.dotfiles/ssh/config` to the top of `~/.ssh/config`, which
+points `IdentityAgent` at the agent and includes the active profile's
+`ssh/config`. Use `ssh-keys` to list the served keys and `ssh-agent-status` to
+check the daemon.
 
 ### If a secret ever leaks
 
 1. Rotate/revoke it immediately at the source (GitHub, Artifactory, etc.).
 2. If it was ever committed, scrub history with `git filter-repo` and force-push.
-3. Store the new value in the Keychain (`secret-set NAME`).
+3. Update the item in Proton Pass. Nothing else needs to change.

@@ -1,0 +1,13 @@
+# Company git settings. Included LAST by ~/.dotfiles/git/gitconfig.symlink,
+# so anything here overrides the shared and machine-local config.
+[user]
+    email = you@company.example
+
+# Username for a company git host (the password/token comes from the
+# credential helper, never from this file).
+# [credential "https://git.company.example"]
+#     username = you
+
+# Directory-scoped identity, e.g. only for repos under ~/workspace/company:
+# [includeIf "gitdir:~/workspace/company/"]
+#     path = ~/.config/dotfiles/profile/git/gitconfig.work

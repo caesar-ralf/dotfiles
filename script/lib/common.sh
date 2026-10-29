@@ -24,6 +24,17 @@ DOTFILES_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 DOTFILES_ROOT="$(cd "${DOTFILES_LIB_DIR}/../.." && pwd -P)"
 export DOTFILES="${DOTFILES:-$DOTFILES_ROOT}"
 
+# Company profiles (see profiles/README.md). Each lives in profiles/<name>/ as
+# its own private repo; the active one is a symlink at DOTFILES_PROFILE_LINK.
+DOTFILES_PROFILES_DIR="${DOTFILES}/profiles"
+export DOTFILES_PROFILE_LINK="${DOTFILES_PROFILE_LINK:-$HOME/.config/dotfiles/profile}"
+
+# Name of the active profile, or empty when none is active.
+active_profile() {
+    [ -L "$DOTFILES_PROFILE_LINK" ] && [ -d "$DOTFILES_PROFILE_LINK" ] || return 0
+    basename "$(readlink "$DOTFILES_PROFILE_LINK")"
+}
+
 # --- Colours ---------------------------------------------------------------
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
     C_RESET="$(tput sgr0)"

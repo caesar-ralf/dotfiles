@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Placeholder: each file in this folder is autoloaded as a command while the
+# profile is active. The file name is the command name. Delete this one.
+echo "hello from the $(basename "$(readlink "$HOME/.config/dotfiles/profile")") profile"

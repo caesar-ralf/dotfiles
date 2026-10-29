@@ -8,8 +8,13 @@ bin/cloud_sql_proxy
 # --- Maven cache & credentials (never commit) ---
 m2.symlink/repository/
 m2.symlink/wrapper/
-m2.symlink/settings.xml
-m2.symlink/settings.xml.bkup
+m2.symlink/settings.xml*
+!m2.symlink/settings.xml.example
+
+# --- Company profiles: each is its own PRIVATE repo, never committed here ---
+/profiles/*
+!/profiles/README.md
+!/profiles/_template/
 
 # --- Secrets: local, never-committed overrides ---
 # Any file ending in .local.zsh is machine-local and git-ignored.

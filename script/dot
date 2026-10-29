@@ -6,7 +6,7 @@
 # you're on the latest and greatest:
 #     dot                 # update Homebrew and re-run all installers
 #     dot --edit          # open the dotfiles repo in $EDITOR
-#     dot --secrets       # (re)configure secrets in the Keychain
+#     dot --secrets       # check Proton Pass login + every secret reference
 #     dot --no-update     # run installers without `brew update` first
 
 ## constants
@@ -33,7 +33,7 @@ Usage: dot [options]
 
 Options:
   -e, --edit       Open the dotfiles directory in \$EDITOR and exit
-  -s, --secrets    Run the interactive secrets setup and exit
+  -s, --secrets    Check Proton Pass login and every secret reference, then exit
       --no-update  Skip 'brew update' (just re-run the installers)
       --no-edit    (internal) no-op, kept for bootstrap compatibility
   -h, --help       Show this help message and exit
@@ -45,7 +45,7 @@ while test $# -gt 0; do
     case "$1" in
         -h|--help)      usage 0 ;;
         -e|--edit)      exec "${EDITOR:-vim}" "${DOTFILES}" ;;
-        -s|--secrets)   exec "${DOTFILES}/script/secrets" ;;
+        -s|--secrets)   exec "${DOTFILES}/secrets/bin/secret" status ;;
         --no-update)    DO_UPDATE=false ;;
         --no-edit)      ;; # accepted for compatibility with bootstrap
         *)              warn "Invalid option: $1"; usage 1 ;;

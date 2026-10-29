@@ -11,11 +11,23 @@ export BREW_PREFIX="${HOMEBREW_PREFIX:-$(brew --prefix)}"
 # your project folder that we can `c [tab]` to
 export PROJECTS="~/workspace"
 
+# Active company profile (see profiles/README.md): a symlink to profiles/<name>.
+export DOTFILES_PROFILE_LINK="$HOME/.config/dotfiles/profile"
+
 # all of our zsh files
 # NOTE: use a bounded (depth-2) glob, NOT `**`. A recursive `**/*.zsh` would
 # descend into m2.symlink/repository/ (16k+ Maven cache dirs) on every startup.
+# The active profile's files are appended, so they load after (and can
+# override) the global ones in every phase below.
 typeset -U config_files
-config_files=($DOTFILES/*/*.zsh)
+config_files=($DOTFILES/*/*.zsh $DOTFILES_PROFILE_LINK/*/*.zsh(N))
+
+# Autoload the active profile's commands (<feature>/functions/*).
+for fn_dir in $DOTFILES_PROFILE_LINK/*/functions(N/); do
+  fpath=($fn_dir $fpath)
+  autoload -U $fn_dir/*(N.:t)
+done
+unset fn_dir
 
 # load the path files first (files named _path.zsh)
 for file in ${(M)config_files:#*/_path.zsh}

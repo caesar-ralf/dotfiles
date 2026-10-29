@@ -6,7 +6,8 @@
 #   1. Create git/gitconfig.local.symlink (asks for your name/email once).
 #   2. Symlink every *.symlink file into $HOME.
 #   3. (macOS) Install Homebrew + all dependencies via `script/dot`.
-#   4. Offer to set up your secrets in the Keychain via `script/secrets`.
+#   4. Check your Proton Pass login and secret references (`secret status`).
+#   5. Point you at the company profile commands (`profile`).
 #
 # It is safe to re-run: existing symlinks are detected and you are asked what
 # to do with anything that already exists. Set DOTFILES_YES=1 to auto-confirm.
@@ -135,12 +136,34 @@ install_dependencies() {
 }
 
 setup_secrets() {
-    header "Secrets"
-    if confirm "Set up your secrets (GitHub / Artifactory) now?"; then
-        "${DOTFILES}/script/secrets"
-    else
-        note "  You can do this later with: script/secrets"
+    header "Secrets (Proton Pass)"
+    local secret_cmd="${DOTFILES}/secrets/bin/secret"
+    if ! command_exists pass-cli; then
+        warn "pass-cli not found. Install the Proton Pass CLI, then run: secret login"
+        return 0
     fi
+    if pass-cli test >/dev/null 2>&1; then
+        success "Logged in to Proton Pass."
+    elif confirm "Log in to Proton Pass now?"; then
+        pass-cli login || warn "Login failed. Retry later with: secret login"
+    else
+        note "  You can do this later with: secret login"
+        return 0
+    fi
+    "$secret_cmd" status || true
+}
+
+setup_profile() {
+    header "Company profile"
+    local name
+    name="$(active_profile)"
+    if [ -n "$name" ]; then
+        success "Active profile: ${name}"
+        return 0
+    fi
+    "${DOTFILES}/script/profile" list
+    note "  Get a profile:  profile clone <private-repo-url>   or   profile new <name>"
+    note "  Activate it:    profile use <name>"
 }
 
 main() {
@@ -155,6 +178,7 @@ main() {
     install_dotfiles
     install_dependencies
     setup_secrets
+    setup_profile
 
     header "Done"
     success "All installed! 🎉"

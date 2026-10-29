@@ -33,14 +33,34 @@ else
 fi
 
 # Find every topic installer and run it. Prune the huge Maven cache so we don't
-# walk 16k+ directories under m2.symlink/repository looking for install.sh.
+# walk 16k+ directories under m2.symlink/repository looking for install.sh, and
+# prune profiles/ (only the ACTIVE profile is installed, below).
 header "Running topic installers"
 while IFS= read -r installer; do
     info "→ ${installer#"${DOTFILES}"/}"
     sh -c "$installer"
 done < <(find "${DOTFILES}" \
             -path "${DOTFILES}/m2.symlink/repository" -prune -o \
+            -path "${DOTFILES}/profiles" -prune -o \
             -type f -name install.sh -print)
+
+# Active company profile: its Brewfiles and installers.
+profile_name="$(active_profile)"
+if [ -n "$profile_name" ]; then
+    header "Profile: ${profile_name}"
+    for brewfile in "$DOTFILES_PROFILE_LINK"/*/Brewfile; do
+        [ -f "$brewfile" ] || continue
+        if command_exists brew; then
+            info "→ brew bundle ${brewfile#"${DOTFILES_PROFILE_LINK}"/}"
+            brew bundle --file="$brewfile"
+        fi
+    done
+    for installer in "$DOTFILES_PROFILE_LINK"/*/install.sh; do
+        [ -f "$installer" ] || continue
+        info "→ ${installer#"${DOTFILES_PROFILE_LINK}"/}"
+        PROFILE_NAME="$profile_name" PROFILE_DIR="$DOTFILES_PROFILE_LINK" sh -c "$installer"
+    done
+fi
 
 header "Done"
 success "All installers finished."

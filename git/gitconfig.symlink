@@ -1,5 +1,6 @@
-# Shared git config. Machine/identity specific bits (name, email, credential
-# helper, signing key) live in ~/.gitconfig.local, included first below.
+# Shared git config. Machine specific bits (name, credential helper, signing
+# key) live in ~/.gitconfig.local, included first below. Company specific bits
+# (work email, company hosts) live in the active profile, included at the end.
 [include]
     path = ~/.gitconfig.local
 [hub]
@@ -187,14 +188,10 @@
     submoduleSummary = true
 
 # ===========================================================================
-# Signing (ssh via 1Password), credentials, url rewrites
+# Signing (ssh keys served by the Proton Pass agent, see ssh/), url rewrites
 # ===========================================================================
 [gpg]
     format = ssh
-[gpg "ssh"]
-    program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
-[credential "https://gitlab.oss.volvoc3.com"]
-    username = cfranzho
 # use ssh instead of https for github and gists that I cloned over http
 [url "git@github.com:"]
     insteadOf = "https://github.com/"
@@ -217,3 +214,10 @@
     fsckobjects = true
 [receive]
     fsckobjects = true
+
+# ===========================================================================
+# Active company profile (profiles/<name>/git/gitconfig). Included LAST so it
+# overrides everything above. Missing file (no active profile) = no-op.
+# ===========================================================================
+[include]
+    path = ~/.config/dotfiles/profile/git/gitconfig

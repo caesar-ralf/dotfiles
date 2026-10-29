@@ -2,13 +2,13 @@
 #
 # commit-msg hook: append the JIRA ticket parsed from the branch name.
 #
-# A branch named like `WEAV-1234.short.description` (or WEAV-1234-...) gets the
-# ticket `WEAV-1234` appended to the commit message, unless the message already
+# A branch named like `PROJ-1234.short.description` (or PROJ-1234-...) gets the
+# ticket `PROJ-1234` appended to the commit message, unless the message already
 # references a ticket. Protected branches, a detached HEAD, and merges are
 # skipped.
 #
 # Create branches with the ticket in the name, e.g.
-#   git switch -c WEAV-1234.some.description
+#   git switch -c PROJ-1234.some.description
 #
 # Override the pattern per repo if your keys differ:
 #   git config hooks.ticketPattern '[A-Z][A-Z0-9]+-[0-9]+'
@@ -57,7 +57,7 @@ fi
 ticket="$(extract "$branch")"
 if [ -z "$ticket" ]; then
     warn "No JIRA ticket found in branch ${C_KEY}${branch}${C_RST}."
-    warn "Add one yourself, or name branches like ${C_OK}WEAV-1234.short.description${C_RST}."
+    warn "Add one yourself, or name branches like ${C_OK}PROJ-1234.short.description${C_RST}."
     exit 0
 fi
 

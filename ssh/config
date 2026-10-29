@@ -1,0 +1,9 @@
+# Managed by ~/.dotfiles/ssh/config. Included at the top of ~/.ssh/config by
+# ssh/install.sh, so these values win (ssh uses the first value it sees).
+
+# Proton Pass SSH agent (started by ssh/agent.zsh).
+IdentityAgent ~/.ssh/proton-pass-agent.sock
+
+# Active company profile's ssh settings (Host blocks for company git servers,
+# jump hosts, ...). Missing file = no-op.
+Include ~/.config/dotfiles/profile/ssh/config

@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+#
+# profile: manage company profiles (see profiles/README.md).
+#
+#     profile                     show the active profile
+#     profile list                list available profiles
+#     profile use <name>          activate (switches if another is active)
+#     profile off                 deactivate the current profile
+#     profile new <name>          create profiles/<name> from the template (+ git init)
+#     profile clone <url> [name]  clone a private profile repo into profiles/<name>
+#
+# Activating a profile symlinks ~/.config/dotfiles/profile -> profiles/<name>
+# and runs every <feature>/activate.sh in it; deactivating runs every
+# <feature>/deactivate.sh and removes the symlink. Open a new shell afterwards.
+
+__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${__dir}/lib/common.sh"
+
+set -o errexit
+set -o errtrace
+set -o pipefail
+[[ "${DEBUG:-}" = true ]] && set -o xtrace
+
+usage() {
+    cat <<EOF
+profile -- manage company profiles
+
+Usage:
+  profile                     Show the active profile and its features
+  profile list                List available profiles (* = active)
+  profile use <name>          Activate a profile (switches if another is active)
+  profile off                 Deactivate the current profile
+  profile new <name>          Create profiles/<name> from the template (git init)
+  profile clone <url> [name]  Clone a private profile repo into profiles/<name>
+
+After use/off, open a new shell (exec zsh). Run \`dot\` to install the
+profile's Brewfile(s) and installers.
+EOF
+    exit "${1:-0}"
+}
+
+profile_dir() { printf '%s/%s' "$DOTFILES_PROFILES_DIR" "$1"; }
+
+valid_name() {
+    case "$1" in
+        ""|_*|.*|*/*) fail "Invalid profile name: '$1'" ;;
+    esac
+}
+
+# Run every <feature>/<hook>.sh of a profile, with its context exported.
+run_hooks() {
+    local dir="$1" hook="$2" script
+    for script in "$dir"/*/"$hook".sh; do
+        [ -f "$script" ] || continue
+        info "${hook}: ${script#"${dir}"/}"
+        PROFILE_NAME="$(basename "$dir")" PROFILE_DIR="$dir" DOTFILES="$DOTFILES" \
+            bash "$script" || warn "${script#"${dir}"/} failed"
+    done
+}
+
+cmd_status() {
+    local name
+    name="$(active_profile)"
+    if [ -z "$name" ]; then
+        info "No active profile. ${C_DIM}(profile list / profile use <name>)${C_RESET}"
+        return 0
+    fi
+    success "Active profile: ${C_BOLD}${name}${C_RESET} ${C_DIM}($(profile_dir "$name"))${C_RESET}"
+    local feature
+    for feature in "$DOTFILES_PROFILE_LINK"/*/; do
+        [ -d "$feature" ] && note "  • $(basename "$feature")"
+    done
+    return 0
+}
+
+cmd_list() {
+    local active dir name found=0
+    active="$(active_profile)"
+    for dir in "$DOTFILES_PROFILES_DIR"/*/; do
+        name="$(basename "$dir")"
+        case "$name" in _*) continue ;; esac
+        found=1
+        if [ "$name" = "$active" ]; then
+            printf '  %s* %s%s\n' "$C_GREEN" "$name" "$C_RESET"
+        else
+            printf '    %s\n' "$name"
+        fi
+    done
+    [ "$found" = 1 ] || note "  No profiles yet. Create one with: profile new <name>"
+}
+
+cmd_off() {
+    local name
+    name="$(active_profile)"
+    if [ -z "$name" ]; then
+        info "No active profile."
+        return 0
+    fi
+    header "Deactivating ${name}"
+    run_hooks "$(profile_dir "$name")" deactivate
+    rm -f "$DOTFILES_PROFILE_LINK"
+    success "Profile ${name} deactivated. Open a new shell: exec zsh"
+}
+
+cmd_use() {
+    local name="$1" dir
+    valid_name "$name"
+    dir="$(profile_dir "$name")"
+    [ -d "$dir" ] || fail "No such profile: $name (see: profile list)"
+
+    if [ "$(active_profile)" = "$name" ]; then
+        success "Profile ${name} is already active."
+        return 0
+    fi
+    [ -n "$(active_profile)" ] && cmd_off
+
+    header "Activating ${name}"
+    mkdir -p "$(dirname "$DOTFILES_PROFILE_LINK")"
+    ln -sfn "$dir" "$DOTFILES_PROFILE_LINK"
+    run_hooks "$dir" activate
+    success "Profile ${name} active. Open a new shell (exec zsh); run \`dot\` for its Brewfile/installers."
+}
+
+cmd_new() {
+    local name="$1" dir
+    valid_name "$name"
+    dir="$(profile_dir "$name")"
+    [ -e "$dir" ] && fail "profiles/${name} already exists."
+    cp -R "$DOTFILES_PROFILES_DIR/_template" "$dir"
+    git -C "$dir" init --quiet
+    success "Created profiles/${name} from the template (its own git repo)."
+    note "  Edit it, then push it to a PRIVATE remote:"
+    note "    git -C profiles/${name} remote add origin <private-repo-url>"
+    note "  Activate it with: profile use ${name}"
+}
+
+cmd_clone() {
+    local url="$1" name="${2:-}"
+    [ -n "$url" ] || usage 1
+    if [ -z "$name" ]; then
+        name="$(basename "$url" .git)"
+        name="${name#dotfiles-profile-}"
+    fi
+    valid_name "$name"
+    [ -e "$(profile_dir "$name")" ] && fail "profiles/${name} already exists."
+    git clone "$url" "$(profile_dir "$name")"
+    success "Cloned into profiles/${name}. Activate it with: profile use ${name}"
+}
+
+case "${1:-}" in
+    ""|status)  cmd_status ;;
+    -h|--help)  usage 0 ;;
+    list|ls)    cmd_list ;;
+    use)        [ -n "${2:-}" ] || usage 1; cmd_use "$2" ;;
+    off)        cmd_off ;;
+    new)        [ -n "${2:-}" ] || usage 1; cmd_new "$2" ;;
+    clone)      cmd_clone "${2:-}" "${3:-}" ;;
+    *)          warn "Invalid command: $1"; usage 1 ;;
+esac
